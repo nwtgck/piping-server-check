@@ -37,6 +37,7 @@ func post_first_byte_by_byte_streaming() Check {
 				result.Errors = append(result.Errors, NewError("failed to post", err))
 				return
 			}
+			checkProtocol(&result, postResp, subConfig.Protocol)
 			if postResp.StatusCode != 200 {
 				result.Errors = append(result.Errors, NotOkStatusError(postResp.StatusCode))
 				return
@@ -55,6 +56,11 @@ func post_first_byte_by_byte_streaming() Check {
 			getResp, err := getHttpClient.Do(getReq)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to get", err))
+				return
+			}
+			checkProtocol(&result, getResp, subConfig.Protocol)
+			if getResp.StatusCode != 200 {
+				result.Errors = append(result.Errors, NotOkStatusError(getResp.StatusCode))
 				return
 			}
 

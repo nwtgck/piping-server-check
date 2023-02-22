@@ -154,6 +154,24 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 	return
 }
 
+func checkProtocol(result *Result, resp *http.Response, expectedProto string) {
+	var ok bool
+	switch expectedProto {
+	case Http1_0:
+		ok = resp.Proto == "HTTP/1.0"
+	case Http1_1:
+		ok = resp.Proto == "HTTP/1.1"
+	// TODO: h2, h2c OK?
+	case H2:
+		ok = resp.Proto == "HTTP/2.0"
+	case H2c:
+		ok = resp.Proto == "HTTP/2.0"
+	}
+	if !ok {
+		result.Errors = append(result.Errors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))
+	}
+}
+
 func AllChecks() []Check {
 	return []Check{
 		post_first(),
