@@ -3,6 +3,7 @@ package check
 import (
 	"github.com/google/uuid"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -26,34 +27,53 @@ func post_first() Check {
 			bodyString := "my message"
 			url := httpServerUrl + "/" + path
 
-			postResp, err := postHttpClient.Post(url, "text/plain", strings.NewReader(bodyString))
-			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to post", err))
-				return
-			}
-			if postResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(postResp.StatusCode))
-				return
-			}
+			ch := make(chan struct{})
 
-			getResp, err := getHttpClient.Get(url)
-			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to get", err))
-				return
-			}
-			if getResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(getResp.StatusCode))
-				return
-			}
-			bodyBytes, err := io.ReadAll(getResp.Body)
-			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to read up", err))
-				return
-			}
-			if string(bodyBytes) != bodyString {
-				result.Errors = append(result.Errors, NewError("message different", nil))
-				return
-			}
+			go func() {
+				postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+				if err != nil {
+					result.Errors = append(result.Errors, NewError("failed to create POST request", err))
+					return
+				}
+				postResp, err := postHttpClient.Do(postReq)
+				if err != nil {
+					result.Errors = append(result.Errors, NewError("failed to post", err))
+					return
+				}
+				if postResp.StatusCode != 200 {
+					result.Errors = append(result.Errors, NotOkStatusError(postResp.StatusCode))
+					return
+				}
+				ch <- struct{}{}
+			}()
+
+			////// Post
+			//time.Sleep(1 * time.Second)
+
+			go func() {
+				getResp, err := getHttpClient.Get(url)
+				if err != nil {
+					result.Errors = append(result.Errors, NewError("failed to get", err))
+					return
+				}
+				if getResp.StatusCode != 200 {
+					result.Errors = append(result.Errors, NotOkStatusError(getResp.StatusCode))
+					return
+				}
+				bodyBytes, err := io.ReadAll(getResp.Body)
+				if err != nil {
+					result.Errors = append(result.Errors, NewError("failed to read up", err))
+					return
+				}
+				if string(bodyBytes) != bodyString {
+					result.Errors = append(result.Errors, NewError("message different", nil))
+					return
+				}
+				ch <- struct{}{}
+			}()
+
+			<-ch
+			<-ch
 			return
 		},
 	}

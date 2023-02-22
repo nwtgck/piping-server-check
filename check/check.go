@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"github.com/nwtgck/piping-server-check/http1_0_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"io"
 	"net"
@@ -32,7 +33,9 @@ func httpProtocolToClient(protocol string) *http.Client {
 	switch protocol {
 	//case Http1_0:
 	case Http1_1:
-		return &http.Client{} // TODO:
+		return &http.Client{
+			Transport: http1_0_round_tripper.Http10RoundTripper{},
+		} // TODO:
 	case H2:
 		return &http.Client{} // TODO:
 	}
