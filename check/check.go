@@ -139,7 +139,9 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 		errCh <- fmt.Errorf("%+v, stderr: %s", err, stderrString)
 	}()
 
-	stopSerer = func() { cmd.Process.Kill() }
+	stopSerer = func() {
+		cmd.Process.Signal(os.Interrupt)
+	}
 	httpAddress := net.JoinHostPort("localhost", httpPort)
 	httpUrl = "http://" + httpAddress
 
