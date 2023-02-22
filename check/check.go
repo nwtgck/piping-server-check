@@ -156,7 +156,6 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 	}()
 
 	err = <-errCh
-	close(errCh)
 	return
 }
 
@@ -164,6 +163,7 @@ func AllChecks() []Check {
 	return []Check{
 		post_first(),
 		get_first(),
+		post_first_byte_by_byte_streaming(),
 	}
 }
 

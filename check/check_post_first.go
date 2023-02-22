@@ -22,8 +22,9 @@ func post_first() Check {
 			httpClient := httpProtocolToClient(subConfig.Protocol)
 			path := uuid.NewString()
 			bodyString := "my message"
+			url := httpServerUrl + "/" + path
 
-			postResp, err := httpClient.Post(httpServerUrl+"/"+path, "text/plain", strings.NewReader(bodyString))
+			postResp, err := httpClient.Post(url, "text/plain", strings.NewReader(bodyString))
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to post", err))
 				return
@@ -33,7 +34,7 @@ func post_first() Check {
 				return
 			}
 
-			getResp, err := httpClient.Get(httpServerUrl + "/" + path)
+			getResp, err := httpClient.Get(url)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to get", err))
 				return
