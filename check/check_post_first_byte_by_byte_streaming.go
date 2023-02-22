@@ -11,7 +11,7 @@ func post_first_byte_by_byte_streaming() Check {
 	name := checkName()
 	return Check{
 		Name:              name,
-		AcceptedProtocols: []string{Http1_0, Http1_1, H2},
+		AcceptedProtocols: []string{Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
 			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
 			if err != nil {
@@ -71,13 +71,11 @@ func post_first_byte_by_byte_streaming() Check {
 
 			for i := 1; i < 256; i++ {
 				writeBytes := []byte{byte(i)}
-				_, err := pw.Write(writeBytes)
-				if err != nil {
+				if _, err := pw.Write(writeBytes); err != nil {
 					result.Errors = append(result.Errors, NewError("failed to send request body", err))
 					return
 				}
-				_, err = io.ReadFull(getResp.Body, buff[:])
-				if err != nil {
+				if _, err = io.ReadFull(getResp.Body, buff[:]); err != nil {
 					result.Errors = append(result.Errors, NewError("failed to read GET response body", err))
 					return
 				}

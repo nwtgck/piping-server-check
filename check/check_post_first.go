@@ -10,7 +10,7 @@ func post_first() Check {
 	name := checkName()
 	return Check{
 		Name:              name,
-		AcceptedProtocols: []string{Http1_0, Http1_1, H2},
+		AcceptedProtocols: []string{Http1_0, Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
 			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
 			if err != nil {
@@ -19,12 +19,15 @@ func post_first() Check {
 			}
 			defer stopServer()
 
-			httpClient := httpProtocolToClient(subConfig.Protocol)
+			postHttpClient := httpProtocolToClient(subConfig.Protocol)
+			defer postHttpClient.CloseIdleConnections()
+			getHttpClient := httpProtocolToClient(subConfig.Protocol)
+			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"
 			url := httpServerUrl + "/" + path
 
-			postResp, err := httpClient.Post(url, "text/plain", strings.NewReader(bodyString))
+			postResp, err := postHttpClient.Post(url, "text/plain", strings.NewReader(bodyString))
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to post", err))
 				return
@@ -34,7 +37,7 @@ func post_first() Check {
 				return
 			}
 
-			getResp, err := httpClient.Get(url)
+			getResp, err := getHttpClient.Get(url)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to get", err))
 				return
