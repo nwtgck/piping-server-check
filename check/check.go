@@ -85,37 +85,19 @@ func checkName() string {
 	return functionName[index+1:]
 }
 
-const startServerDebug = false
-
-func startServer(cmd []string, httpPort string, httpsPort string) (*exec.Cmd, error) {
-	c := exec.Command(cmd[0], cmd[1:]...)
+func startServer(cmd []string, httpPort string, httpsPort string) (c *exec.Cmd, stdout io.ReadCloser, stderr io.ReadCloser, err error) {
+	c = exec.Command(cmd[0], cmd[1:]...)
 	c.Env = append(os.Environ(), "HTTP_PORT="+httpPort, "HTTPS_PORT="+httpsPort)
-
-	if startServerDebug {
-		go func() {
-			rc, err := c.StdoutPipe()
-			if err != nil {
-				panic(err)
-			}
-			_, err = io.Copy(os.Stderr, rc)
-			if err != nil {
-				panic(err)
-			}
-		}()
-
-		go func() {
-			rc, err := c.StderrPipe()
-			if err != nil {
-				panic(err)
-			}
-			_, err = io.Copy(os.Stderr, rc)
-			if err != nil {
-				panic(err)
-			}
-		}()
+	stdout, err = c.StdoutPipe()
+	if err != nil {
+		return
 	}
-
-	return c, c.Start()
+	stderr, err = c.StderrPipe()
+	if err != nil {
+		return
+	}
+	err = c.Start()
+	return
 }
 
 func waitTCPServer(address string) {
@@ -135,7 +117,7 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 		return
 	}
 
-	cmd, err := startServer(config.RunServerCmd, httpPort, "")
+	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, "")
 	if err != nil {
 		result.Errors = append(result.Errors, FailedToRunServerError(err))
 		return
@@ -143,7 +125,18 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 
 	errCh := make(chan error)
 	go func() {
-		errCh <- cmd.Wait()
+		var stderrString string
+		go func() {
+			var buf [2048]byte
+			n, _ := io.ReadFull(stderr, buf[:])
+			stderrString = string(buf[:n])
+		}()
+		err := cmd.Wait()
+		if err == nil {
+			errCh <- nil
+			return
+		}
+		errCh <- fmt.Errorf("%+v, stderr: %s", err, stderrString)
 	}()
 
 	stopSerer = func() { cmd.Process.Kill() }
