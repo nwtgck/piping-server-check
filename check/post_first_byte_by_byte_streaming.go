@@ -8,9 +8,8 @@ import (
 )
 
 func post_first_byte_by_byte_streaming() Check {
-	name := checkName()
 	return Check{
-		Name:              name,
+		Name:              checkName(),
 		AcceptedProtocols: []string{Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
 			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
