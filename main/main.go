@@ -50,27 +50,19 @@ var rootCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
 
-		for _, c := range checks {
-			for _, protocol := range protocols {
-				subConfig := check.SubConfig{
-					Protocol:          protocol,
-					TlsSkipVerifyCert: flag.tlsSkipVerify,
-				}
-				result := check.RunCheck(&c, &config, &subConfig)
-				jsonBytes, err := json.Marshal(&result)
-				if err != nil {
-					return err
-				}
-
-				line := string(jsonBytes)
-				if len(result.Errors) == 0 {
-					line = color.GreenString(fmt.Sprintf("✔︎%s", line))
-				} else {
-					line = color.RedString(fmt.Sprintf("✖︎%s", line))
-					//line = color.YellowString(fmt.Sprintf("⚠︎%s", line))
-				}
-				fmt.Println(line)
+		for result := range runChecks(checks, &config, protocols) {
+			jsonBytes, err := json.Marshal(&result)
+			if err != nil {
+				return err
 			}
+			line := string(jsonBytes)
+			if len(result.Errors) == 0 {
+				line = color.GreenString(fmt.Sprintf("✔︎%s", line))
+			} else {
+				line = color.RedString(fmt.Sprintf("✖︎%s", line))
+				//line = color.YellowString(fmt.Sprintf("⚠︎%s", line))
+			}
+			fmt.Println(line)
 		}
 		// TODO: non-zero exit code when checks have errors
 		return nil
@@ -82,4 +74,21 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(-1)
 	}
+}
+
+func runChecks(checks []check.Check, config *check.Config, protocols []check.Protocol) <-chan check.Result {
+	ch := make(chan check.Result)
+	go func() {
+		for _, c := range checks {
+			for _, protocol := range protocols {
+				subConfig := check.SubConfig{
+					Protocol:          protocol,
+					TlsSkipVerifyCert: flag.tlsSkipVerify,
+				}
+				ch <- check.RunCheck(&c, config, &subConfig)
+			}
+		}
+		close(ch)
+	}()
+	return ch
 }
