@@ -97,10 +97,26 @@ type Result struct {
 	Errors    []ResultError `json:"errors,omitempty"`
 }
 
+const (
+	SubCheckNameProtocol    = "protocol"
+	SubCheckNameTransferred = "transferred"
+)
+
+type RunCheckResult struct {
+	// empty string is ok
+	SubCheckName string
+	Errors       []ResultError
+	IsWarning    bool
+}
+
+func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
+	return RunCheckResult{Errors: []ResultError{resultError}}
+}
+
 type Check struct {
 	Name              string
 	AcceptedProtocols []Protocol
-	run               func(config *Config, subConfig *SubConfig) Result
+	run               func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult)
 }
 
 func checkName() string {
@@ -138,21 +154,21 @@ func waitTCPServer(address string) {
 	}
 }
 
-func prepareServer(config *Config, subConfig *SubConfig, result *Result) (serverUrl string, stopSerer func()) {
+func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
 	httpPort, err := util.GetTCPPort()
 	if err != nil {
-		result.Errors = append(result.Errors, FailedToGetPortError())
+		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
 	}
 	httpsPort, err := util.GetTCPPort()
 	if err != nil {
-		result.Errors = append(result.Errors, FailedToGetPortError())
+		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
 	}
 
 	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort)
 	if err != nil {
-		result.Errors = append(result.Errors, FailedToRunServerError(err))
+		resultErrors = append(resultErrors, FailedToRunServerError(err))
 		return
 	}
 
@@ -166,7 +182,7 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 		}()
 		err := cmd.Wait()
 		if err != nil {
-			result.Errors = append(result.Errors, NewError(fmt.Sprintf("%+v, stderr: %s", err, stderrString), err))
+			resultErrors = append(resultErrors, NewError(fmt.Sprintf("%+v, stderr: %s", err, stderrString), err))
 		}
 		finishCh <- struct{}{}
 	}()
@@ -194,7 +210,8 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 	return
 }
 
-func checkProtocol(result *Result, resp *http.Response, expectedProto Protocol) {
+func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
+	var resultErrors []ResultError
 	var versionOk bool
 	switch expectedProto {
 	case Http1_0, Http1_0_tls:
@@ -205,15 +222,16 @@ func checkProtocol(result *Result, resp *http.Response, expectedProto Protocol) 
 		versionOk = resp.Proto == "HTTP/2.0"
 	}
 	if !versionOk {
-		result.Errors = append(result.Errors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))
+		resultErrors = append(resultErrors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))
 	}
 	shouldUseTls := protocolUsesTls(expectedProto)
 	if shouldUseTls && resp.TLS == nil {
-		result.Errors = append(result.Errors, NewError("should use TLS but not used", nil))
+		resultErrors = append(resultErrors, NewError("should use TLS but not used", nil))
 	}
 	if !shouldUseTls && resp.TLS != nil {
-		result.Errors = append(result.Errors, NewError("should not use TLS but used", nil))
+		resultErrors = append(resultErrors, NewError("should not use TLS but used", nil))
 	}
+	return resultErrors
 }
 
 func AllChecks() []Check {
@@ -224,13 +242,25 @@ func AllChecks() []Check {
 	}
 }
 
-func RunCheck(c *Check, config *Config, subConfig *SubConfig) Result {
-	result := c.run(config, subConfig)
-	result.Name = c.Name
-	result.Protocol = subConfig.Protocol
-	if len(result.Errors) == 0 {
-		result.OkForJson = new(bool)
-		*result.OkForJson = true
+func RunCheck(c *Check, config *Config, subConfig *SubConfig, resultCh chan<- Result) {
+	runCheckResultCh := make(chan RunCheckResult)
+	go func() {
+		c.run(config, subConfig, runCheckResultCh)
+	}()
+	for runCheckResult := range runCheckResultCh {
+		var result Result
+		if runCheckResult.SubCheckName == "" {
+			result.Name = c.Name
+		} else {
+			result.Name = c.Name + "." + runCheckResult.SubCheckName
+		}
+		result.Errors = runCheckResult.Errors
+		// TODO: use IsWarning
+		result.Protocol = subConfig.Protocol
+		if len(result.Errors) == 0 {
+			result.OkForJson = new(bool)
+			*result.OkForJson = true
+		}
+		resultCh <- result
 	}
-	return result
 }

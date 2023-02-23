@@ -89,7 +89,7 @@ func runChecks(checks []check.Check, config *check.Config, protocols []check.Pro
 					Protocol:          protocol,
 					TlsSkipVerifyCert: flag.tlsSkipVerify,
 				}
-				ch <- check.RunCheck(&c, config, &subConfig)
+				check.RunCheck(&c, config, &subConfig, ch)
 			}
 		}
 		close(ch)

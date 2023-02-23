@@ -11,9 +11,11 @@ func post_first() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_0, Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			serverUrl, stopServer := prepareServer(config, subConfig, &result)
-			if len(result.Errors) != 0 {
+		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
+			defer close(runCheckResultCh)
+			serverUrl, stopServer, resultErrors := prepareServer(config, subConfig)
+			if len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{Errors: resultErrors}
 				return
 			}
 			defer stopServer()
@@ -28,45 +30,50 @@ func post_first() Check {
 
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to create POST request", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
 				return
 			}
 			postReq.Header.Set("Content-Type", "text/plain")
 			postResp, err := postHttpClient.Do(postReq)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to post", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
 				return
 			}
-			checkProtocol(&result, postResp, subConfig.Protocol)
+			if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+			}
 			if postResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(postResp.StatusCode))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
 				return
 			}
 
 			getReq, err := http.NewRequest("GET", url, nil)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to create GET request", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
 				return
 			}
 			getResp, err := getHttpClient.Do(getReq)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to get", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
 				return
 			}
-			checkProtocol(&result, getResp, subConfig.Protocol)
+			if resultErrors := checkProtocol(getResp, subConfig.Protocol); len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+			}
 			if getResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(getResp.StatusCode))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
 				return
 			}
 			bodyBytes, err := io.ReadAll(getResp.Body)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to read up", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read up", err))
 				return
 			}
 			if string(bodyBytes) != bodyString {
-				result.Errors = append(result.Errors, NewError("message different", nil))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("message different", nil))
 				return
 			}
+			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
 	}

@@ -11,9 +11,11 @@ func post_first_byte_by_byte_streaming() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			serverUrl, stopServer := prepareServer(config, subConfig, &result)
-			if len(result.Errors) != 0 {
+		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
+			defer close(runCheckResultCh)
+			serverUrl, stopServer, resultErrors := prepareServer(config, subConfig)
+			if len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{Errors: resultErrors}
 				return
 			}
 			defer stopServer()
@@ -28,63 +30,67 @@ func post_first_byte_by_byte_streaming() Check {
 			pr, pw := io.Pipe()
 			postReq, err := http.NewRequest("POST", url, pr)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to create request", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 				return
 			}
 			postResp, err := postHttpClient.Do(postReq)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to post", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
 				return
 			}
-			checkProtocol(&result, postResp, subConfig.Protocol)
+			if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+			}
 			if postResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(postResp.StatusCode))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
 				return
 			}
 			// Need to send one byte to GET
 			if _, err := pw.Write([]byte{0}); err != nil {
-				result.Errors = append(result.Errors, NewError("failed to send request body", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to send request body", err))
 				return
 			}
 
 			getReq, err := http.NewRequest("GET", url, nil)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to create request", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 				return
 			}
 			getResp, err := getHttpClient.Do(getReq)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to get", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
 				return
 			}
-			checkProtocol(&result, getResp, subConfig.Protocol)
+			if resultErrors := checkProtocol(getResp, subConfig.Protocol); len(resultErrors) != 0 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+			}
 			if getResp.StatusCode != 200 {
-				result.Errors = append(result.Errors, NotOkStatusError(getResp.StatusCode))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
 				return
 			}
 
 			var buff [1]byte
 			if _, err = io.ReadFull(getResp.Body, buff[:]); err != nil {
-				result.Errors = append(result.Errors, NewError("failed to read GET response body", err))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
 				return
 			}
 			if buff[0] != 0 {
-				result.Errors = append(result.Errors, NewError("different first byte of body", nil))
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("different first byte of body", nil))
 				return
 			}
 
 			for i := 1; i < 256; i++ {
 				writeBytes := []byte{byte(i)}
 				if _, err := pw.Write(writeBytes); err != nil {
-					result.Errors = append(result.Errors, NewError("failed to send request body", err))
+					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to send request body", err))
 					return
 				}
 				if _, err = io.ReadFull(getResp.Body, buff[:]); err != nil {
-					result.Errors = append(result.Errors, NewError("failed to read GET response body", err))
+					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
 					return
 				}
 				if byte(i) != buff[0] {
-					result.Errors = append(result.Errors, NewError(fmt.Sprintf("different body: i=%d", i), nil))
+					runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("different body: i=%d", i), nil))
 					return
 				}
 			}
