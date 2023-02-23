@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		// TODO: hard code
-		protocols := []string{check.Http1_1, check.Http1_1_tls}
+		protocols := []check.Protocol{check.Http1_1, check.Http1_1_tls}
 		for _, c := range checks {
 			for _, protocol := range protocols {
 				subConfig := check.SubConfig{

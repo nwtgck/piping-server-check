@@ -14,12 +14,16 @@ import (
 	"time"
 )
 
-const Http1_0 = "http1.0"
-const Http1_0_tls = "http1.0-tls"
-const Http1_1 = "http1.1"
-const Http1_1_tls = "http1.1-tls"
-const H2 = "h2"
-const H2c = "h2c"
+type Protocol string
+
+const (
+	Http1_0     = Protocol("http1.0")
+	Http1_0_tls = Protocol("http1.0-tls")
+	Http1_1     = Protocol("http1.1")
+	Http1_1_tls = Protocol("http1.1-tls")
+	H2          = Protocol("h2")
+	H2c         = Protocol("h2c")
+)
 
 type Config struct {
 	// $HTTP_PORT, $HTTPS_PORT
@@ -28,11 +32,11 @@ type Config struct {
 
 // TODO: name
 type SubConfig struct {
-	Protocol          string
+	Protocol          Protocol
 	TlsSkipVerifyCert bool
 }
 
-func protocolUsesTls(protocol string) bool {
+func protocolUsesTls(protocol Protocol) bool {
 	switch protocol {
 	case Http1_0_tls, Http1_1_tls, H2:
 		return true
@@ -41,7 +45,7 @@ func protocolUsesTls(protocol string) bool {
 	}
 }
 
-func httpProtocolToClient(protocol string, tlsSkipVerifyCert bool) *http.Client {
+func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Client {
 	tlsConfig := &tls.Config{InsecureSkipVerify: tlsSkipVerifyCert}
 	// TODO: impl
 	switch protocol {
@@ -87,14 +91,14 @@ func NotOkStatusError(status int) ResultError {
 
 type Result struct {
 	Name      string        `json:"name"`
-	Protocol  string        `json:"protocol"`
+	Protocol  Protocol      `json:"protocol"`
 	OkForJson *bool         `json:"ok,omitempty"`
 	Errors    []ResultError `json:"errors,omitempty"`
 }
 
 type Check struct {
 	Name              string
-	AcceptedProtocols []string
+	AcceptedProtocols []Protocol
 	run               func(config *Config, subConfig *SubConfig) Result
 }
 
@@ -190,7 +194,7 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 	return
 }
 
-func checkProtocol(result *Result, resp *http.Response, expectedProto string) {
+func checkProtocol(result *Result, resp *http.Response, expectedProto Protocol) {
 	var versionOk bool
 	switch expectedProto {
 	case Http1_0, Http1_0_tls:
