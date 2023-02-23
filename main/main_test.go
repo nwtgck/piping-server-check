@@ -14,6 +14,6 @@ func TestRunServerCommandFailed(t *testing.T) {
 	protocols := []check.Protocol{check.Http1_1}
 	for result := range runChecks(checks, &config, protocols) {
 		assert.NotNil(t, result.Errors)
-		assert.Contains(t, result.Errors[0].Message, "my-unknown-command: command not found")
+		assert.Regexp(t, "my-unknown-command:.+not found", result.Errors[0].Message)
 	}
 }
