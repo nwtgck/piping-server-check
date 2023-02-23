@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
 			protocols = append(protocols, check.H2)
 		}
 		if len(protocols) == 0 {
-			fmt.Fprintf(os.Stderr, "Specify --http1.1 or http1.1-tls to check")
+			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
 
 		for _, c := range checks {
