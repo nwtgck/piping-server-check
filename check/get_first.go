@@ -28,7 +28,7 @@ func get_first() Check {
 			bodyString := "my message"
 			url := httpServerUrl + "/" + path
 
-			getReqGotConn := make(chan struct{})
+			getReqWroteRequest := make(chan struct{})
 			getReqFinished := make(chan struct{})
 			go func() {
 				getReq, err := http.NewRequest("GET", url, nil)
@@ -37,9 +37,9 @@ func get_first() Check {
 					return
 				}
 				clientTrace := &httptrace.ClientTrace{
-					GotConn: func(connInfo httptrace.GotConnInfo) {
-						getReqGotConn <- struct{}{}
-						close(getReqGotConn)
+					WroteRequest: func(info httptrace.WroteRequestInfo) {
+						getReqWroteRequest <- struct{}{}
+						close(getReqWroteRequest)
 					},
 				}
 				getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), clientTrace))
@@ -66,7 +66,7 @@ func get_first() Check {
 			}()
 
 			// Wait for the GET request
-			<-getReqGotConn
+			<-getReqWroteRequest
 
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 			if err != nil {
