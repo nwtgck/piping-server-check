@@ -90,6 +90,10 @@ func NotOkStatusError(status int) ResultError {
 	return ResultError{Message: fmt.Sprintf("not OK status: %d", status)}
 }
 
+func ContentTypeMismatchError(expectedContentType string, actualContentType string) ResultError {
+	return ResultError{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, actualContentType)}
+}
+
 type Result struct {
 	Name      string        `json:"name"`
 	Protocol  Protocol      `json:"protocol"`
@@ -98,8 +102,9 @@ type Result struct {
 }
 
 const (
-	SubCheckNameProtocol    = "protocol"
-	SubCheckNameTransferred = "transferred"
+	SubCheckNameProtocol              = "protocol"
+	SubCheckNameContentTypeForwarding = "content_type_forwarding"
+	SubCheckNameTransferred           = "transferred"
 )
 
 type RunCheckResult struct {

@@ -28,12 +28,13 @@ func post_first() Check {
 			bodyString := "my message"
 			url := serverUrl + "/" + path
 
+			contentType := "text/plain"
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 			if err != nil {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
 				return
 			}
-			postReq.Header.Set("Content-Type", "text/plain")
+			postReq.Header.Set("Content-Type", contentType)
 			postResp, err := postHttpClient.Do(postReq)
 			if err != nil {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
@@ -63,6 +64,12 @@ func post_first() Check {
 			if getResp.StatusCode != 200 {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
 				return
+			}
+			receivedContentType := getResp.Header.Get("Content-Type")
+			if receivedContentType == contentType {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
+			} else {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(contentType, receivedContentType)}}
 			}
 			bodyBytes, err := io.ReadAll(getResp.Body)
 			if err != nil {

@@ -29,6 +29,7 @@ func get_first() Check {
 			bodyString := "my message"
 			url := serverUrl + "/" + path
 
+			contentType := "text/plain"
 			getReqWroteRequest := make(chan bool)
 			getReqFinished := make(chan struct{})
 			go func() {
@@ -58,6 +59,12 @@ func get_first() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
 					return
 				}
+				receivedContentType := getResp.Header.Get("Content-Type")
+				if receivedContentType == contentType {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
+				} else {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(contentType, receivedContentType)}}
+				}
 				bodyBytes, err := io.ReadAll(getResp.Body)
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read up", err))
@@ -79,7 +86,7 @@ func get_first() Check {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
 				return
 			}
-			postReq.Header.Set("Content-Type", "text/plain")
+			postReq.Header.Set("Content-Type", contentType)
 			postResp, err := postHttpClient.Do(postReq)
 			if err != nil {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
