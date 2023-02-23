@@ -11,12 +11,14 @@ import (
 
 var flag struct {
 	serverCommand string
+	tlsSkipVerify bool
 }
 
 func init() {
 	cobra.OnInitialize()
 	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server")
 	rootCmd.MarkPersistentFlagRequired("server-command")
+	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
 }
 
 var rootCmd = &cobra.Command{
@@ -31,7 +33,8 @@ var rootCmd = &cobra.Command{
 		for _, c := range checks {
 			subConfig := check.SubConfig{
 				// TODO:
-				Protocol: check.Http1_1,
+				Protocol:          check.Http1_1,
+				TlsSkipVerifyCert: flag.tlsSkipVerify,
 			}
 			result := check.RunCheck(&c, &config, &subConfig)
 			jsonBytes, err := json.Marshal(&result)
@@ -48,6 +51,7 @@ var rootCmd = &cobra.Command{
 			}
 			fmt.Println(line)
 		}
+		// TODO: non-zero exit code when checks have errors
 		return nil
 	},
 }

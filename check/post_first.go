@@ -19,9 +19,9 @@ func post_first() Check {
 			}
 			defer stopServer()
 
-			postHttpClient := httpProtocolToClient(subConfig.Protocol)
+			postHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
-			getHttpClient := httpProtocolToClient(subConfig.Protocol)
+			getHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"

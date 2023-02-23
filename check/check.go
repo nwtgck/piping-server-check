@@ -1,6 +1,7 @@
 package check
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/nwtgck/piping-server-check/util"
 	"io"
@@ -25,16 +26,26 @@ type Config struct {
 
 // TODO: name
 type SubConfig struct {
-	Protocol string
+	Protocol          string
+	TlsSkipVerifyCert bool
 }
 
-func httpProtocolToClient(protocol string) *http.Client {
+func httpProtocolToClient(protocol string, tlsSkipVerifyCert bool) *http.Client {
+	tlsConfig := &tls.Config{InsecureSkipVerify: tlsSkipVerifyCert}
 	switch protocol {
 	//case Http1_0:
 	case Http1_1:
-		return &http.Client{} // TODO:
+		return &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		}
 	case H2:
-		return &http.Client{} // TODO:
+		return &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		}
 	}
 	return nil
 }
