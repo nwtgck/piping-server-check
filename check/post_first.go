@@ -3,6 +3,7 @@ package check
 import (
 	"github.com/google/uuid"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -26,7 +27,13 @@ func post_first() Check {
 			bodyString := "my message"
 			url := httpServerUrl + "/" + path
 
-			postResp, err := postHttpClient.Post(url, "text/plain", strings.NewReader(bodyString))
+			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+			if err != nil {
+				result.Errors = append(result.Errors, NewError("failed to create POST request", err))
+				return
+			}
+			postReq.Header.Set("Content-Type", "text/plain")
+			postResp, err := postHttpClient.Do(postReq)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to post", err))
 				return
@@ -37,7 +44,12 @@ func post_first() Check {
 				return
 			}
 
-			getResp, err := getHttpClient.Get(url)
+			getReq, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				result.Errors = append(result.Errors, NewError("failed to create GET request", err))
+				return
+			}
+			getResp, err := getHttpClient.Do(getReq)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to get", err))
 				return
