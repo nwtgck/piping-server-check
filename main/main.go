@@ -14,6 +14,7 @@ var flag struct {
 	tlsSkipVerify bool
 	http1_1       bool
 	http1_1Tls    bool
+	h2            bool
 }
 
 func init() {
@@ -23,6 +24,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
+	rootCmd.PersistentFlags().BoolVarP(&flag.h2, "h2", "", false, "HTTP/2 (TLS)")
 }
 
 var rootCmd = &cobra.Command{
@@ -40,6 +42,9 @@ var rootCmd = &cobra.Command{
 		}
 		if flag.http1_1Tls {
 			protocols = append(protocols, check.Http1_1_tls)
+		}
+		if flag.h2 {
+			protocols = append(protocols, check.H2)
 		}
 		if len(protocols) == 0 {
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or http1.1-tls to check")

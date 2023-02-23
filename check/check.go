@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/nwtgck/piping-server-check/util"
+	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -56,9 +57,9 @@ func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Clien
 				TLSClientConfig: tlsConfig,
 			},
 		}
-	case H2:
+	case H2, H2c:
 		return &http.Client{
-			Transport: &http.Transport{
+			Transport: &http2.Transport{
 				TLSClientConfig: tlsConfig,
 			},
 		}
