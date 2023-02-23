@@ -117,6 +117,7 @@ type Result struct {
 	Warnings  []ResultWarning `json:"warnings,omitempty"`
 }
 
+// Subcheck name is top-level. The same subcheck names in different checks should be the same meaning.
 const (
 	SubCheckNameProtocol              = "protocol"
 	SubCheckNameContentTypeForwarding = "content_type_forwarding"
