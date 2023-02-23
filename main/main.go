@@ -50,6 +50,7 @@ var rootCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
 
+		hasError := false
 		for result := range runChecks(checks, &config, protocols) {
 			jsonBytes, err := json.Marshal(&result)
 			if err != nil {
@@ -59,12 +60,15 @@ var rootCmd = &cobra.Command{
 			if len(result.Errors) == 0 {
 				line = color.GreenString(fmt.Sprintf("✔︎%s", line))
 			} else {
+				hasError = true
 				line = color.RedString(fmt.Sprintf("✖︎%s", line))
 				//line = color.YellowString(fmt.Sprintf("⚠︎%s", line))
 			}
 			fmt.Println(line)
 		}
-		// TODO: non-zero exit code when checks have errors
+		if hasError {
+			os.Exit(1)
+		}
 		return nil
 	},
 }
