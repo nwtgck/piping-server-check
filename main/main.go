@@ -12,6 +12,8 @@ import (
 var flag struct {
 	serverCommand string
 	tlsSkipVerify bool
+	http1_1       bool
+	http1_1Tls    bool
 }
 
 func init() {
@@ -19,6 +21,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server")
 	rootCmd.MarkPersistentFlagRequired("server-command")
 	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
+	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
+	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
 }
 
 var rootCmd = &cobra.Command{
@@ -30,9 +34,17 @@ var rootCmd = &cobra.Command{
 			// TODO: sh -c
 			RunServerCmd: []string{"sh", "-c", flag.serverCommand},
 		}
+		var protocols []check.Protocol
+		if flag.http1_1 {
+			protocols = append(protocols, check.Http1_1)
+		}
+		if flag.http1_1Tls {
+			protocols = append(protocols, check.Http1_1_tls)
+		}
+		if len(protocols) == 0 {
+			fmt.Fprintf(os.Stderr, "Specify --http1.1 or http1.1-tls to check")
+		}
 
-		// TODO: hard code
-		protocols := []check.Protocol{check.Http1_1, check.Http1_1_tls}
 		for _, c := range checks {
 			for _, protocol := range protocols {
 				subConfig := check.SubConfig{
