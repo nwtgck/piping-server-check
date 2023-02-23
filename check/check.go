@@ -94,16 +94,33 @@ func ContentTypeMismatchError(expectedContentType string, actualContentType stri
 	return ResultError{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, actualContentType)}
 }
 
+type ResultWarning struct {
+	Message string `json:"message"`
+}
+
+func NewWarning(message string, err error) ResultWarning {
+	if err == nil {
+		return ResultWarning{Message: message}
+	}
+	return ResultWarning{Message: fmt.Sprintf("%s: %+v", message, err)}
+}
+
+func XRobotsTagNoneWarning(actualValue string) ResultWarning {
+	return ResultWarning{Message: fmt.Sprintf("X-Robots-Tag: none is recommeded but found '%+v'", actualValue)}
+}
+
 type Result struct {
-	Name      string        `json:"name"`
-	Protocol  Protocol      `json:"protocol"`
-	OkForJson *bool         `json:"ok,omitempty"`
-	Errors    []ResultError `json:"errors,omitempty"`
+	Name      string          `json:"name"`
+	Protocol  Protocol        `json:"protocol"`
+	OkForJson *bool           `json:"ok,omitempty"`
+	Errors    []ResultError   `json:"errors,omitempty"`
+	Warnings  []ResultWarning `json:"warnings,omitempty"`
 }
 
 const (
 	SubCheckNameProtocol              = "protocol"
 	SubCheckNameContentTypeForwarding = "content_type_forwarding"
+	SubCheckNameXRobotsTagNone        = "x_robots_tag_none"
 	SubCheckNameTransferred           = "transferred"
 )
 
@@ -111,7 +128,7 @@ type RunCheckResult struct {
 	// empty string is ok
 	SubCheckName string
 	Errors       []ResultError
-	IsWarning    bool
+	Warnings     []ResultWarning
 }
 
 func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
@@ -260,7 +277,7 @@ func RunCheck(c *Check, config *Config, subConfig *SubConfig, resultCh chan<- Re
 			result.Name = c.Name + "." + runCheckResult.SubCheckName
 		}
 		result.Errors = runCheckResult.Errors
-		// TODO: use IsWarning
+		result.Warnings = runCheckResult.Warnings
 		result.Protocol = subConfig.Protocol
 		if len(result.Errors) == 0 {
 			result.OkForJson = new(bool)

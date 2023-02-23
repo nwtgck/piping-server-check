@@ -65,6 +65,12 @@ func get_first() Check {
 				} else {
 					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(contentType, receivedContentType)}}
 				}
+				receivedXRobotsTag := getResp.Header.Get("X-Robots-Tag")
+				if receivedXRobotsTag == "none" {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone}
+				} else {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
+				}
 				bodyBytes, err := io.ReadAll(getResp.Body)
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read up", err))
