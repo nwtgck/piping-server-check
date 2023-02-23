@@ -15,7 +15,9 @@ import (
 )
 
 const Http1_0 = "http1.0"
+const Http1_0_tls = "http1.0-tls"
 const Http1_1 = "http1.1"
+const Http1_1_tls = "http1.1-tls"
 const H2 = "h2"
 const H2c = "h2c"
 
@@ -30,11 +32,21 @@ type SubConfig struct {
 	TlsSkipVerifyCert bool
 }
 
+func protocolUsesTls(protocol string) bool {
+	switch protocol {
+	case Http1_0_tls, Http1_1_tls, H2:
+		return true
+	default:
+		return false
+	}
+}
+
 func httpProtocolToClient(protocol string, tlsSkipVerifyCert bool) *http.Client {
 	tlsConfig := &tls.Config{InsecureSkipVerify: tlsSkipVerifyCert}
+	// TODO: impl
 	switch protocol {
-	//case Http1_0:
-	case Http1_1:
+	//case Http1_0, Http1_0_tls:
+	case Http1_1, Http1_1_tls:
 		return &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: tlsConfig,
@@ -121,14 +133,19 @@ func waitTCPServer(address string) {
 	}
 }
 
-func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSerer func(), err error) {
+func prepareServer(config *Config, subConfig *SubConfig, result *Result) (serverUrl string, stopSerer func(), err error) {
 	httpPort, err := util.GetTCPPort()
 	if err != nil {
 		result.Errors = append(result.Errors, FailedToGetPortError())
 		return
 	}
+	httpsPort, err := util.GetTCPPort()
+	if err != nil {
+		result.Errors = append(result.Errors, FailedToGetPortError())
+		return
+	}
 
-	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, "")
+	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort)
 	if err != nil {
 		result.Errors = append(result.Errors, FailedToRunServerError(err))
 		return
@@ -153,8 +170,16 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 	stopSerer = func() {
 		cmd.Process.Signal(os.Interrupt)
 	}
-	httpAddress := net.JoinHostPort("localhost", httpPort)
-	httpUrl = "http://" + httpAddress
+	serverPort := httpPort
+	if protocolUsesTls(subConfig.Protocol) {
+		serverPort = httpsPort
+	}
+	httpAddress := net.JoinHostPort("localhost", serverPort)
+	if protocolUsesTls(subConfig.Protocol) {
+		serverUrl = "https://" + httpAddress
+	} else {
+		serverUrl = "http://" + httpAddress
+	}
 
 	go func() {
 		waitTCPServer(httpAddress)
@@ -166,20 +191,24 @@ func prepareHTTPServer(config *Config, result *Result) (httpUrl string, stopSere
 }
 
 func checkProtocol(result *Result, resp *http.Response, expectedProto string) {
-	var ok bool
+	var versionOk bool
 	switch expectedProto {
-	case Http1_0:
-		ok = resp.Proto == "HTTP/1.0"
-	case Http1_1:
-		ok = resp.Proto == "HTTP/1.1"
-	// TODO: h2, h2c OK?
-	case H2:
-		ok = resp.Proto == "HTTP/2.0"
-	case H2c:
-		ok = resp.Proto == "HTTP/2.0"
+	case Http1_0, Http1_0_tls:
+		versionOk = resp.Proto == "HTTP/1.0"
+	case Http1_1, Http1_1_tls:
+		versionOk = resp.Proto == "HTTP/1.1"
+	case H2, H2c:
+		versionOk = resp.Proto == "HTTP/2.0"
 	}
-	if !ok {
+	if !versionOk {
 		result.Errors = append(result.Errors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))
+	}
+	shouldUseTls := protocolUsesTls(expectedProto)
+	if shouldUseTls && resp.TLS == nil {
+		result.Errors = append(result.Errors, NewError("should use TLS but not used", nil))
+	}
+	if !shouldUseTls && resp.TLS != nil {
+		result.Errors = append(result.Errors, NewError("should not use TLS but used", nil))
 	}
 }
 

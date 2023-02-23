@@ -12,7 +12,7 @@ func post_first_byte_by_byte_streaming() Check {
 		Name:              checkName(),
 		AcceptedProtocols: []string{Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
+			serverUrl, stopServer, err := prepareServer(config, subConfig, &result)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to prepare HTTP server", err))
 				return
@@ -24,7 +24,7 @@ func post_first_byte_by_byte_streaming() Check {
 			getHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
-			url := httpServerUrl + "/" + path
+			url := serverUrl + "/" + path
 
 			pr, pw := io.Pipe()
 			postReq, err := http.NewRequest("POST", url, pr)

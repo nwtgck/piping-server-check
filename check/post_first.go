@@ -12,7 +12,7 @@ func post_first() Check {
 		Name:              checkName(),
 		AcceptedProtocols: []string{Http1_0, Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
+			serverUrl, stopServer, err := prepareServer(config, subConfig, &result)
 			if err != nil {
 				result.Errors = append(result.Errors, NewError("failed to prepare HTTP server", err))
 				return
@@ -25,7 +25,7 @@ func post_first() Check {
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"
-			url := httpServerUrl + "/" + path
+			url := serverUrl + "/" + path
 
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 			if err != nil {

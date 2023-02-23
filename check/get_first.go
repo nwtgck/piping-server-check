@@ -13,9 +13,9 @@ func get_first() Check {
 		Name:              checkName(),
 		AcceptedProtocols: []string{Http1_0, Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			httpServerUrl, stopServer, err := prepareHTTPServer(config, &result)
+			serverUrl, stopServer, err := prepareServer(config, subConfig, &result)
 			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to prepare HTTP server", err))
+				result.Errors = append(result.Errors, NewError("failed to prepare server", err))
 				return
 			}
 			defer stopServer()
@@ -26,7 +26,7 @@ func get_first() Check {
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"
-			url := httpServerUrl + "/" + path
+			url := serverUrl + "/" + path
 
 			getReqWroteRequest := make(chan struct{})
 			getReqFinished := make(chan struct{})
