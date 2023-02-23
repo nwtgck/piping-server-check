@@ -119,10 +119,11 @@ type Result struct {
 
 // Subcheck name is top-level. The same subcheck names in different checks should be the same meaning.
 const (
-	SubCheckNameProtocol              = "protocol"
-	SubCheckNameContentTypeForwarding = "content_type_forwarding"
-	SubCheckNameXRobotsTagNone        = "x_robots_tag_none"
-	SubCheckNameTransferred           = "transferred"
+	SubCheckNameProtocol                     = "protocol"
+	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
+	SubCheckNameContentTypeForwarding        = "content_type_forwarding"
+	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
+	SubCheckNameTransferred                  = "transferred"
 )
 
 type RunCheckResult struct {

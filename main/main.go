@@ -90,6 +90,7 @@ func runChecks(checks []check.Check, config *check.Config, protocols []check.Pro
 					Protocol:          protocol,
 					TlsSkipVerifyCert: flag.tlsSkipVerify,
 				}
+				// TODO: timeout for RunCheck considering long-time check
 				check.RunCheck(&c, config, &subConfig, ch)
 			}
 		}

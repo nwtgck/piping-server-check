@@ -4,8 +4,12 @@ import (
 	"github.com/google/uuid"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"strings"
+	"time"
 )
+
+// TODO: check PUT method
 
 func post_first() Check {
 	return Check{
@@ -29,30 +33,54 @@ func post_first() Check {
 			url := serverUrl + "/" + path
 
 			contentType := "text/plain"
-			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
-			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
-				return
-			}
-			postReq.Header.Set("Content-Type", contentType)
-			postResp, err := postHttpClient.Do(postReq)
-			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
-				return
-			}
-			if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-			}
-			if postResp.StatusCode != 200 {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
-				return
+			var getWroteRequest bool
+			postReqArrived := make(chan struct{})
+			postFinished := make(chan struct{})
+			go func() {
+				defer func() { postFinished <- struct{}{} }()
+				postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+				if err != nil {
+					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
+					return
+				}
+				postReq.Header.Set("Content-Type", contentType)
+				postResp, err := postHttpClient.Do(postReq)
+				if err != nil {
+					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
+					return
+				}
+				postReqArrived <- struct{}{}
+				if getWroteRequest {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
+				} else {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
+				}
+				if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+				}
+				if postResp.StatusCode != 200 {
+					runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
+					return
+				}
+			}()
+
+			select {
+			case <-postReqArrived:
+			// TODO: hard code
+			case <-time.After(5 * time.Second):
 			}
 
+			getTrace := &httptrace.ClientTrace{
+				WroteRequest: func(info httptrace.WroteRequestInfo) {
+					getWroteRequest = true
+				},
+			}
 			getReq, err := http.NewRequest("GET", url, nil)
 			if err != nil {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
 				return
 			}
+			getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), getTrace))
 			getResp, err := getHttpClient.Do(getReq)
 			if err != nil {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
@@ -86,6 +114,7 @@ func post_first() Check {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("message different", nil))
 				return
 			}
+			<-postFinished
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
