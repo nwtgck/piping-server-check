@@ -138,7 +138,7 @@ func waitTCPServer(address string) {
 	}
 }
 
-func prepareServer(config *Config, subConfig *SubConfig, result *Result) (serverUrl string, stopSerer func(), err error) {
+func prepareServer(config *Config, subConfig *SubConfig, result *Result) (serverUrl string, stopSerer func()) {
 	httpPort, err := util.GetTCPPort()
 	if err != nil {
 		result.Errors = append(result.Errors, FailedToGetPortError())
@@ -156,7 +156,7 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 		return
 	}
 
-	errCh := make(chan error)
+	finishCh := make(chan struct{})
 	go func() {
 		var stderrString string
 		go func() {
@@ -165,11 +165,10 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 			stderrString = string(buf[:n])
 		}()
 		err := cmd.Wait()
-		if err == nil {
-			errCh <- nil
-			return
+		if err != nil {
+			result.Errors = append(result.Errors, NewError(fmt.Sprintf("%+v, stderr: %s", err, stderrString), err))
 		}
-		errCh <- fmt.Errorf("%+v, stderr: %s", err, stderrString)
+		finishCh <- struct{}{}
 	}()
 
 	stopSerer = func() {
@@ -188,10 +187,10 @@ func prepareServer(config *Config, subConfig *SubConfig, result *Result) (server
 
 	go func() {
 		waitTCPServer(httpAddress)
-		errCh <- nil
+		finishCh <- struct{}{}
 	}()
 
-	err = <-errCh
+	<-finishCh
 	return
 }
 

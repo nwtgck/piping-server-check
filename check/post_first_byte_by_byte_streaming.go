@@ -12,9 +12,8 @@ func post_first_byte_by_byte_streaming() Check {
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig) (result Result) {
-			serverUrl, stopServer, err := prepareServer(config, subConfig, &result)
-			if err != nil {
-				result.Errors = append(result.Errors, NewError("failed to prepare HTTP server", err))
+			serverUrl, stopServer := prepareServer(config, subConfig, &result)
+			if len(result.Errors) != 0 {
 				return
 			}
 			defer stopServer()
