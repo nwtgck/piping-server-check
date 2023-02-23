@@ -27,9 +27,10 @@ func get_first() Check {
 			bodyString := "my message"
 			url := serverUrl + "/" + path
 
-			getReqWroteRequest := make(chan struct{})
+			getReqWroteRequest := make(chan bool)
 			getReqFinished := make(chan struct{})
 			go func() {
+				defer func() { getReqFinished <- struct{}{} }()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					result.Errors = append(result.Errors, NewError("failed to create GET request", err))
@@ -37,7 +38,7 @@ func get_first() Check {
 				}
 				clientTrace := &httptrace.ClientTrace{
 					WroteRequest: func(info httptrace.WroteRequestInfo) {
-						getReqWroteRequest <- struct{}{}
+						getReqWroteRequest <- true
 						close(getReqWroteRequest)
 					},
 				}
@@ -45,6 +46,7 @@ func get_first() Check {
 				getResp, err := getHttpClient.Do(getReq)
 				if err != nil {
 					result.Errors = append(result.Errors, NewError("failed to get", err))
+					getReqWroteRequest <- false
 					return
 				}
 				checkProtocol(&result, getResp, subConfig.Protocol)
@@ -61,11 +63,12 @@ func get_first() Check {
 					result.Errors = append(result.Errors, NewError("message different", nil))
 					return
 				}
-				getReqFinished <- struct{}{}
 			}()
 
 			// Wait for the GET request
-			<-getReqWroteRequest
+			if ok := <-getReqWroteRequest; !ok {
+				return
+			}
 
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 			if err != nil {
