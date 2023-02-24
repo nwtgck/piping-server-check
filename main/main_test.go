@@ -8,11 +8,16 @@ import (
 	"time"
 )
 
-var serverPkg1_12_8_path string
+var pipingServerPkg1_12_8Path string
+var goPipingServer0_4_0Path string
 
 func init() {
 	var err error
-	serverPkg1_12_8_path, err = downloadPipingServerPkgIfNotCached("1.12.8-1")
+	pipingServerPkg1_12_8Path, err = downloadPipingServerPkgIfNotCached("1.12.8-1")
+	if err != nil {
+		panic(err)
+	}
+	goPipingServer0_4_0Path, err = downloadGoPipingServerIfNotCached("0.4.0")
 	if err != nil {
 		panic(err)
 	}
@@ -30,10 +35,10 @@ func TestRunServerCommandFailed(t *testing.T) {
 	}
 }
 
-func TestRunChecks(t *testing.T) {
+func TestRunChecksForHTTP1_1(t *testing.T) {
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", serverPkg1_12_8_path)},
+		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", pipingServerPkg1_12_8Path)},
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
@@ -60,4 +65,33 @@ func TestRunChecks(t *testing.T) {
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: check.Http1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
+}
+
+func TestRunChecksForH2C(t *testing.T) {
+	checks := check.AllChecks()
+	config := check.Config{
+		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", goPipingServer0_4_0Path)},
+		// Short timeouts are OK because the checks are always timeout when they are long
+		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
+		FirstByteCheckTimeout:               100 * time.Millisecond,
+		GetResponseReceivedTimeout:          100 * time.Millisecond,
+	}
+	protocols := []check.Protocol{check.H2c}
+	var errorResultNames []string
+	var warningCheckNames []string
+	for result := range runChecks(checks, &config, protocols) {
+		if len(result.Errors) != 0 {
+			errorResultNames = append(errorResultNames, result.Name)
+		}
+		if len(result.Warnings) != 0 {
+			warningCheckNames = append(warningCheckNames, result.Name)
+		}
+	}
+	assert.ElementsMatch(t, errorResultNames, []string{
+		"post_first_byte_by_byte_streaming",
+	})
+	assert.ElementsMatch(t, warningCheckNames, []string{
+		"post_first.sender_response_before_receiver",
+		"put.sender_response_before_receiver",
+	})
 }

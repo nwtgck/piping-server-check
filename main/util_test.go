@@ -11,6 +11,8 @@ import (
 	"runtime"
 )
 
+const cachedBinDirName = ".bin"
+
 func moduleRootPath() (string, error) {
 	dirPath, err := os.Getwd()
 	if err != nil {
@@ -25,13 +27,42 @@ func moduleRootPath() (string, error) {
 	}
 }
 
+func downloadTarGzAndExtractAndFindByFileName(url string, fileBaseName string) (io.Reader, error) {
+	var tarGzResp *http.Response
+	tarGzResp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if tarGzResp.StatusCode != 200 {
+		return nil, fmt.Errorf("status code of GET %s is %d", url, tarGzResp.StatusCode)
+	}
+	gzipReader, err := gzip.NewReader(tarGzResp.Body)
+	if err != nil {
+		return nil, err
+	}
+	tarReader := tar.NewReader(gzipReader)
+	for {
+		var tarHeader *tar.Header
+		tarHeader, err = tarReader.Next()
+		if err == io.EOF {
+			return nil, fmt.Errorf("%s not found", fileBaseName)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if filepath.Base(tarHeader.Name) == fileBaseName {
+			return tarReader, nil
+		}
+	}
+}
+
 func downloadPipingServerPkgIfNotCached(version string) (binPath string, err error) {
 	var rootPath string
 	rootPath, err = moduleRootPath()
 	if err != nil {
 		return
 	}
-	binDirPath := filepath.Join(rootPath, ".bin", "piping-server-pkg", version, runtime.GOOS+"-"+runtime.GOARCH)
+	binDirPath := filepath.Join(rootPath, cachedBinDirName, "piping-server-pkg", version, runtime.GOOS+"-"+runtime.GOARCH)
 	if err = os.MkdirAll(binDirPath, 0755); err != nil {
 		return
 	}
@@ -59,33 +90,48 @@ func downloadPipingServerPkgIfNotCached(version string) (binPath string, err err
 		err = fmt.Errorf("%s not supported", runtime.GOARCH)
 		return
 	}
-	var tarGzResp *http.Response
 	binUrl := fmt.Sprintf("https://github.com/nwtgck/piping-server-pkg/releases/download/v%s/piping-server-pkg-%s-%s.tar.gz", version, pkgOs, pkgArch)
-	tarGzResp, err = http.Get(binUrl)
+	var pipingServerBinReader io.Reader
+	pipingServerBinReader, err = downloadTarGzAndExtractAndFindByFileName(binUrl, "piping-server")
 	if err != nil {
 		return
 	}
-	var gzipReader io.Reader
-	gzipReader, err = gzip.NewReader(tarGzResp.Body)
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		var tarHeader *tar.Header
-		tarHeader, err = tarReader.Next()
-		if err == io.EOF {
-			return "", fmt.Errorf("piping-server binary not found")
-		}
-		if err != nil {
-			return
-		}
-		if filepath.Base(tarHeader.Name) == "piping-server" {
-			var binFile *os.File
-			binFile, err = os.OpenFile(binPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-			if err != nil {
-				return
-			}
-			defer binFile.Close()
-			_, err = io.Copy(binFile, tarReader)
-			return
-		}
+	var binFile *os.File
+	binFile, err = os.OpenFile(binPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return
 	}
+	defer binFile.Close()
+	_, err = io.Copy(binFile, pipingServerBinReader)
+	return
+}
+
+func downloadGoPipingServerIfNotCached(version string) (binPath string, err error) {
+	var rootPath string
+	rootPath, err = moduleRootPath()
+	if err != nil {
+		return
+	}
+	binDirPath := filepath.Join(rootPath, cachedBinDirName, "go-piping-server", version, runtime.GOOS+"-"+runtime.GOARCH)
+	if err = os.MkdirAll(binDirPath, 0755); err != nil {
+		return
+	}
+	binPath = filepath.Join(binDirPath, "piping-server")
+	if stat, _ := os.Stat(binPath); stat != nil {
+		return
+	}
+	binUrl := fmt.Sprintf("https://github.com/nwtgck/go-piping-server/releases/download/v%s/go-piping-server-%s-%s-%s.tar.gz", version, version, runtime.GOOS, runtime.GOARCH)
+	var pipingServerBinReader io.Reader
+	pipingServerBinReader, err = downloadTarGzAndExtractAndFindByFileName(binUrl, "go-piping-server")
+	if err != nil {
+		return
+	}
+	var binFile *os.File
+	binFile, err = os.OpenFile(binPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return
+	}
+	defer binFile.Close()
+	_, err = io.Copy(binFile, pipingServerBinReader)
+	return
 }
