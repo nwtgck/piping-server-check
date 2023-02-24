@@ -100,18 +100,17 @@ func main() {
 	}
 }
 
-func runChecks(checks []check.Check, config *check.Config, protocols []check.Protocol) <-chan check.Result {
+func runChecks(checks []check.Check, commonConfig *check.Config, protocols []check.Protocol) <-chan check.Result {
 	ch := make(chan check.Result)
 	go func() {
 		for _, c := range checks {
 			for _, protocol := range protocols {
-				subConfig := check.SubConfig{
-					Protocol:          protocol,
-					TlsSkipVerifyCert: flag.tlsSkipVerify,
-				}
+				config := *commonConfig
+				config.Protocol = protocol
+				config.TlsSkipVerifyCert = flag.tlsSkipVerify
 				// TODO: timeout for RunCheck considering long-time check
 				// TODO: Use AcceptedProtocols
-				check.RunCheck(&c, config, &subConfig, ch)
+				check.RunCheck(&c, &config, ch)
 			}
 		}
 		close(ch)

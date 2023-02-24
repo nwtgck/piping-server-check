@@ -12,17 +12,17 @@ func get_first() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_0, Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
+		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, subConfig, runCheckResultCh)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
 			if !ok {
 				return
 			}
 			defer stopServerIfNeed()
 
-			postHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+			postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
-			getHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+			getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"
@@ -51,7 +51,7 @@ func get_first() Check {
 					getReqWroteRequest <- false
 					return
 				}
-				if resultErrors := checkProtocol(getResp, subConfig.Protocol); len(resultErrors) != 0 {
+				if resultErrors := checkProtocol(getResp, config.Protocol); len(resultErrors) != 0 {
 					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 				}
 				if getResp.StatusCode != 200 {
@@ -97,7 +97,7 @@ func get_first() Check {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
 				return
 			}
-			if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+			if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
 				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 			}
 			if postResp.StatusCode != 200 {

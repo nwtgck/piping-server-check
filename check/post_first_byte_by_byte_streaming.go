@@ -12,17 +12,17 @@ func post_first_byte_by_byte_streaming() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
+		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, subConfig, runCheckResultCh)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
 			if !ok {
 				return
 			}
 			defer stopServerIfNeed()
 
-			postHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+			postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
-			getHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+			getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			url := serverUrl + "/" + path
@@ -43,7 +43,7 @@ func post_first_byte_by_byte_streaming() Check {
 					return
 				}
 				postReqArrived <- struct{}{}
-				if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+				if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
 					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 				}
 				if postResp.StatusCode != 200 {
@@ -78,7 +78,7 @@ func post_first_byte_by_byte_streaming() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
 					return
 				}
-				if resultErrors := checkProtocol(getResp, subConfig.Protocol); len(resultErrors) != 0 {
+				if resultErrors := checkProtocol(getResp, config.Protocol); len(resultErrors) != 0 {
 					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 				}
 				if getResp.StatusCode != 200 {

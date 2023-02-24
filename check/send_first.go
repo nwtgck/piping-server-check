@@ -13,8 +13,8 @@ func post_first() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_0, Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
-			sendFirstRun("POST", config, subConfig, runCheckResultCh)
+		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
+			sendFirstRun("POST", config, runCheckResultCh)
 		},
 	}
 }
@@ -23,23 +23,23 @@ func put() Check {
 	return Check{
 		Name:              checkName(),
 		AcceptedProtocols: []Protocol{Http1_0, Http1_1, H2, H2c},
-		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
-			sendFirstRun("PUT", config, subConfig, runCheckResultCh)
+		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
+			sendFirstRun("PUT", config, runCheckResultCh)
 		},
 	}
 }
 
-func sendFirstRun(sendMethod string, config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
+func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- RunCheckResult) {
 	defer close(runCheckResultCh)
-	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, subConfig, runCheckResultCh)
+	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
 	if !ok {
 		return
 	}
 	defer stopServerIfNeed()
 
-	postHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+	postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer postHttpClient.CloseIdleConnections()
-	getHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
+	getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer getHttpClient.CloseIdleConnections()
 	path := uuid.NewString()
 	bodyString := "my message"
@@ -68,7 +68,7 @@ func sendFirstRun(sendMethod string, config *Config, subConfig *SubConfig, runCh
 		} else {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
 		}
-		if resultErrors := checkProtocol(postResp, subConfig.Protocol); len(resultErrors) != 0 {
+		if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 		}
 		if postResp.StatusCode != 200 {
@@ -98,7 +98,7 @@ func sendFirstRun(sendMethod string, config *Config, subConfig *SubConfig, runCh
 		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
 		return
 	}
-	if resultErrors := checkProtocol(getResp, subConfig.Protocol); len(resultErrors) != 0 {
+	if resultErrors := checkProtocol(getResp, config.Protocol); len(resultErrors) != 0 {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 	}
 	if getResp.StatusCode != 200 {

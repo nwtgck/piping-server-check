@@ -31,12 +31,8 @@ type Config struct {
 	// $HTTP_PORT, $HTTPS_PORT
 	RunServerCmd        []string
 	ServerSchemalessUrl string
-}
-
-// TODO: name
-type SubConfig struct {
-	Protocol          Protocol
-	TlsSkipVerifyCert bool
+	Protocol            Protocol
+	TlsSkipVerifyCert   bool
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -156,7 +152,7 @@ func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
 type Check struct {
 	Name              string
 	AcceptedProtocols []Protocol
-	run               func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult)
+	run               func(config *Config, runCheckResultCh chan<- RunCheckResult)
 }
 
 func checkName() string {
@@ -195,7 +191,7 @@ func waitTCPServer(address string) {
 	}
 }
 
-func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
+func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
 	httpPort, err := util.GetTCPPort()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
@@ -235,11 +231,11 @@ func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stop
 		cmd.Process.Signal(os.Interrupt)
 	}
 	serverPort := httpPort
-	if protocolUsesTls(subConfig.Protocol) {
+	if protocolUsesTls(config.Protocol) {
 		serverPort = httpsPort
 	}
 	httpAddress := net.JoinHostPort("localhost", serverPort)
-	if protocolUsesTls(subConfig.Protocol) {
+	if protocolUsesTls(config.Protocol) {
 		serverUrl = "https://" + httpAddress
 	} else {
 		serverUrl = "http://" + httpAddress
@@ -254,18 +250,18 @@ func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stop
 	return
 }
 
-func prepareServerUrl(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) (serverUrl string, ok bool, stopServerIfNeed func()) {
+func prepareServerUrl(config *Config, runCheckResultCh chan<- RunCheckResult) (serverUrl string, ok bool, stopServerIfNeed func()) {
 	if config.ServerSchemalessUrl == "" {
 		var stopServer func()
 		var resultErrors []ResultError
-		serverUrl, stopServer, resultErrors = prepareServer(config, subConfig)
+		serverUrl, stopServer, resultErrors = prepareServer(config)
 		if len(resultErrors) != 0 {
 			runCheckResultCh <- RunCheckResult{Errors: resultErrors}
 			return
 		}
 		return serverUrl, true, stopServer
 	}
-	if protocolUsesTls(subConfig.Protocol) {
+	if protocolUsesTls(config.Protocol) {
 		serverUrl = "https:" + config.ServerSchemalessUrl
 	} else {
 		serverUrl = "http:" + config.ServerSchemalessUrl
@@ -306,10 +302,10 @@ func AllChecks() []Check {
 	}
 }
 
-func RunCheck(c *Check, config *Config, subConfig *SubConfig, resultCh chan<- Result) {
+func RunCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {
-		c.run(config, subConfig, runCheckResultCh)
+		c.run(config, runCheckResultCh)
 	}()
 	for runCheckResult := range runCheckResultCh {
 		var result Result
@@ -320,7 +316,7 @@ func RunCheck(c *Check, config *Config, subConfig *SubConfig, resultCh chan<- Re
 		}
 		result.Errors = runCheckResult.Errors
 		result.Warnings = runCheckResult.Warnings
-		result.Protocol = subConfig.Protocol
+		result.Protocol = config.Protocol
 		if len(result.Errors) == 0 {
 			result.OkForJson = new(bool)
 			*result.OkForJson = true
