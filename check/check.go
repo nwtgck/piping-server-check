@@ -29,10 +29,13 @@ const (
 
 type Config struct {
 	// $HTTP_PORT, $HTTPS_PORT
-	RunServerCmd        []string
-	ServerSchemalessUrl string
-	Protocol            Protocol
-	TlsSkipVerifyCert   bool
+	RunServerCmd                        []string
+	ServerSchemalessUrl                 string
+	Protocol                            Protocol
+	TlsSkipVerifyCert                   bool
+	SenderResponseBeforeReceiverTimeout time.Duration
+	FirstByteCheckTimeout               time.Duration
+	GetResponseReceivedTimeout          time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -134,9 +137,6 @@ const (
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
 )
-
-// TODO: to be option
-var senderResponseBeforeReceiverTimeout = 5 * time.Second
 
 type RunCheckResult struct {
 	// empty string is ok

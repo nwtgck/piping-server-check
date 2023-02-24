@@ -79,7 +79,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 
 	select {
 	case <-postReqArrived:
-	case <-time.After(senderResponseBeforeReceiverTimeout):
+	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 
 	getTrace := &httptrace.ClientTrace{

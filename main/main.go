@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 var flag struct {
@@ -68,6 +69,12 @@ var rootCmd = &cobra.Command{
 		if len(protocols) == 0 {
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
+		// TODO: to be option
+		config.SenderResponseBeforeReceiverTimeout = 5 * time.Second
+		// TODO: to be option
+		config.FirstByteCheckTimeout = 5 * time.Second
+		// TODO: to be option
+		config.GetResponseReceivedTimeout = 5 * time.Second
 
 		hasError := false
 		for result := range runChecks(checks, &config, protocols) {

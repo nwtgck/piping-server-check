@@ -5,6 +5,7 @@ import (
 	"github.com/nwtgck/piping-server-check/check"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 var serverPkg1_12_8_path string
@@ -29,11 +30,13 @@ func TestRunServerCommandFailed(t *testing.T) {
 	}
 }
 
-// FIXME: sometimes "signal: killed" occurred in macOS
 func TestRunChecks(t *testing.T) {
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", serverPkg1_12_8_path)},
+		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", serverPkg1_12_8_path)},
+		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
+		FirstByteCheckTimeout:               1 * time.Second,
+		GetResponseReceivedTimeout:          1 * time.Second,
 	}
 	protocols := []check.Protocol{check.Http1_1}
 	var results []check.Result

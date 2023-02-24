@@ -59,7 +59,7 @@ func post_first_byte_by_byte_streaming() Check {
 
 			select {
 			case <-postReqArrived:
-			case <-time.After(senderResponseBeforeReceiverTimeout):
+			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
 			var getResp *http.Response
@@ -87,12 +87,10 @@ func post_first_byte_by_byte_streaming() Check {
 				}
 			}()
 
-			// TODO: to be option
-			getResponseReceivedTimeout := 5 * time.Second
 			select {
 			case <-getResponseReceived:
-			case <-time.After(getResponseReceivedTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", getResponseReceivedTimeout), nil))
+			case <-time.After(config.GetResponseReceivedTimeout):
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
 				return
 			}
 
@@ -110,12 +108,10 @@ func post_first_byte_by_byte_streaming() Check {
 				firstByteChecked <- struct{}{}
 			}()
 
-			// TODO: to be option
-			firstByteCheckTimeout := 5 * time.Second
 			select {
 			case <-firstByteChecked:
-			case <-time.After(firstByteCheckTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get first byte in %s", firstByteCheckTimeout), nil))
+			case <-time.After(config.FirstByteCheckTimeout):
+				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get first byte in %s", config.FirstByteCheckTimeout), nil))
 				return
 			}
 
