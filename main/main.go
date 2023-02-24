@@ -73,11 +73,11 @@ var rootCmd = &cobra.Command{
 			line := string(jsonBytes)
 			if len(result.Errors) != 0 {
 				hasError = true
-				line = color.RedString(fmt.Sprintf("✖︎%s", line))
+				line = color.RedString(fmt.Sprintf("✖︎ %s", line))
 			} else if len(result.Warnings) != 0 {
-				line = color.YellowString(fmt.Sprintf("⚠︎%s", line))
+				line = color.YellowString(fmt.Sprintf("⚠︎ %s", line))
 			} else {
-				line = color.GreenString(fmt.Sprintf("✔︎%s", line))
+				line = color.GreenString(fmt.Sprintf("✔︎ %s", line))
 			}
 			fmt.Println(line)
 		}
