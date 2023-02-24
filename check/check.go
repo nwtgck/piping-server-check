@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/nwtgck/piping-server-check/util"
+	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -25,6 +26,7 @@ const (
 	Http1_1_tls = Protocol("http1.1-tls")
 	H2          = Protocol("h2")
 	H2c         = Protocol("h2c")
+	H3          = Protocol("h3")
 )
 
 type Config struct {
@@ -36,11 +38,12 @@ type Config struct {
 	SenderResponseBeforeReceiverTimeout time.Duration
 	FirstByteCheckTimeout               time.Duration
 	GetResponseReceivedTimeout          time.Duration
+	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
 }
 
 func protocolUsesTls(protocol Protocol) bool {
 	switch protocol {
-	case Http1_0_tls, Http1_1_tls, H2:
+	case Http1_0_tls, Http1_1_tls, H2, H3:
 		return true
 	default:
 		return false
@@ -72,6 +75,12 @@ func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Clien
 	case H2:
 		return &http.Client{
 			Transport: &http2.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		}
+	case H3:
+		return &http.Client{
+			Transport: &http3.RoundTripper{
 				TLSClientConfig: tlsConfig,
 			},
 		}
@@ -279,6 +288,8 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 		versionOk = resp.Proto == "HTTP/1.1"
 	case H2, H2c:
 		versionOk = resp.Proto == "HTTP/2.0"
+	case H3:
+		versionOk = resp.Proto == "HTTP/3.0"
 	}
 	if !versionOk {
 		resultErrors = append(resultErrors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))

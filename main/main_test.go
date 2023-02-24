@@ -95,3 +95,37 @@ func TestRunChecksForH2C(t *testing.T) {
 		"put.sender_response_before_receiver",
 	})
 }
+
+func TestRunChecksForH3(t *testing.T) {
+	keyPath, certPath, err := createKeyAndCert()
+	if err != nil {
+		panic(err)
+	}
+	checks := check.AllChecks()
+	config := check.Config{
+		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_4_0Path, keyPath, certPath)},
+		TlsSkipVerifyCert: true,
+		// Short timeouts are OK because the checks are always timeout when they are long
+		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
+		FirstByteCheckTimeout:               100 * time.Millisecond,
+		GetResponseReceivedTimeout:          100 * time.Millisecond,
+		GetReqWroteRequestWaitForH3:         0,
+	}
+	protocols := []check.Protocol{check.H3}
+	var errorResultNames []string
+	var warningResultNames []string
+	for result := range runChecks(checks, &config, protocols) {
+		if len(result.Errors) != 0 {
+			errorResultNames = append(errorResultNames, result.Name)
+		}
+		if len(result.Warnings) != 0 {
+			warningResultNames = append(warningResultNames, result.Name)
+		}
+	}
+	assert.ElementsMatch(t, errorResultNames, []string{
+		"post_first_byte_by_byte_streaming",
+	})
+	assert.ElementsMatch(t, warningResultNames, []string{
+		"get_first",
+	})
+}

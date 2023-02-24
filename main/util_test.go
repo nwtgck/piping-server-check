@@ -3,8 +3,13 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -134,4 +139,35 @@ func downloadGoPipingServerIfNotCached(version string) (binPath string, err erro
 	defer binFile.Close()
 	_, err = io.Copy(binFile, pipingServerBinReader)
 	return
+}
+
+func createKeyAndCert() (string, string, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		return "", "", err
+	}
+	keyFile, err := os.CreateTemp(os.TempDir(), "key-")
+	if err != nil {
+		return "", "", err
+	}
+	defer keyFile.Close()
+	keyPem := pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}
+	if err := pem.Encode(keyFile, &keyPem); err != nil {
+		return "", "", err
+	}
+	certFile, err := os.CreateTemp(os.TempDir(), "cert-")
+	if err != nil {
+		return "", "", err
+	}
+	defer certFile.Close()
+	certPem := pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
+	if err := pem.Encode(certFile, &certPem); err != nil {
+		return "", "", err
+	}
+	return keyFile.Name(), certFile.Name(), nil
 }

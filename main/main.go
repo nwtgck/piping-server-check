@@ -20,6 +20,7 @@ var flag struct {
 	http1_1Tls          bool
 	h2                  bool
 	h2c                 bool
+	h3                  bool
 }
 
 func init() {
@@ -31,6 +32,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2, "h2", "", false, "HTTP/2 (TLS)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2c, "h2c", "", false, "HTTP/2 cleartext")
+	rootCmd.PersistentFlags().BoolVarP(&flag.h3, "h3", "", false, "HTTP/3")
 }
 
 var rootCmd = &cobra.Command{
@@ -66,15 +68,20 @@ var rootCmd = &cobra.Command{
 		if flag.h2c {
 			protocols = append(protocols, check.H2c)
 		}
+		if flag.h3 {
+			protocols = append(protocols, check.H3)
+		}
 		if len(protocols) == 0 {
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
+		config.TlsSkipVerifyCert = flag.tlsSkipVerify
 		// TODO: to be option
 		config.SenderResponseBeforeReceiverTimeout = 5 * time.Second
 		// TODO: to be option
 		config.FirstByteCheckTimeout = 5 * time.Second
 		// TODO: to be option
 		config.GetResponseReceivedTimeout = 5 * time.Second
+		config.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
 		hasError := false
 		for result := range runChecks(checks, &config, protocols) {
@@ -114,7 +121,6 @@ func runChecks(checks []check.Check, commonConfig *check.Config, protocols []che
 			for _, protocol := range protocols {
 				config := *commonConfig
 				config.Protocol = protocol
-				config.TlsSkipVerifyCert = flag.tlsSkipVerify
 				// TODO: timeout for RunCheck considering long-time check
 				// TODO: Use AcceptedProtocols
 				check.RunCheck(&c, &config, ch)

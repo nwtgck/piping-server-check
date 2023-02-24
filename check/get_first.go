@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"strings"
+	"time"
 )
 
 func get_first() Check {
@@ -81,9 +82,15 @@ func get_first() Check {
 				}
 			}()
 
-			// Wait for the GET request
-			if ok := <-getReqWroteRequest; !ok {
-				return
+			if config.Protocol == H3 {
+				// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+				runCheckResultCh <- RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. Ensuring GET-request-first is not supported in HTTP/3", nil)}}
+				time.Sleep(config.GetReqWroteRequestWaitForH3)
+			} else {
+				// Wait for the GET request
+				if ok := <-getReqWroteRequest; !ok {
+					return
+				}
 			}
 
 			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
