@@ -9,11 +9,11 @@ import (
 func TestRunServerCommandFailed(t *testing.T) {
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd: []string{"sh", "-c", "my-unknown-command"},
+		RunServerCmd: []string{"sh", "-c", "echo 'error on purpose' > /dev/stderr && exit 1"},
 	}
 	protocols := []check.Protocol{check.Http1_1}
 	for result := range runChecks(checks, &config, protocols) {
 		assert.NotNil(t, result.Errors)
-		assert.Regexp(t, "my-unknown-command:.+not found", result.Errors[0].Message)
+		assert.Contains(t, result.Errors[0].Message, "error on purpose")
 	}
 }
