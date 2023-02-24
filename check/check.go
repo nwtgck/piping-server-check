@@ -173,12 +173,13 @@ func startServer(cmd []string, httpPort string, httpsPort string) (c *exec.Cmd, 
 }
 
 func waitTCPServer(address string) {
+	time.Sleep(100 * time.Millisecond)
 	for {
 		_, err := net.Dial("tcp", address)
 		if err == nil {
 			return
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
