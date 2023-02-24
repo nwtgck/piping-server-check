@@ -79,8 +79,7 @@ func sendFirstRun(sendMethod string, config *Config, subConfig *SubConfig, runCh
 
 	select {
 	case <-postReqArrived:
-	// TODO: hard code
-	case <-time.After(5 * time.Second):
+	case <-time.After(senderResponseBeforeReceiverTimeout):
 	}
 
 	getTrace := &httptrace.ClientTrace{

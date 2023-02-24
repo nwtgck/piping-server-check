@@ -127,6 +127,9 @@ const (
 	SubCheckNameTransferred                  = "transferred"
 )
 
+// TODO: to be option
+var senderResponseBeforeReceiverTimeout = 5 * time.Second
+
 type RunCheckResult struct {
 	// empty string is ok
 	SubCheckName string
