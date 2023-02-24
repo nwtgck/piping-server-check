@@ -6,21 +6,24 @@ import (
 	"github.com/fatih/color"
 	"github.com/nwtgck/piping-server-check/check"
 	"github.com/spf13/cobra"
+	"net/url"
 	"os"
+	"strings"
 )
 
 var flag struct {
-	serverCommand string
-	tlsSkipVerify bool
-	http1_1       bool
-	http1_1Tls    bool
-	h2            bool
+	serverCommand       string
+	serverSchemalessUrl string
+	tlsSkipVerify       bool
+	http1_1             bool
+	http1_1Tls          bool
+	h2                  bool
 }
 
 func init() {
 	cobra.OnInitialize()
 	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server")
-	rootCmd.MarkPersistentFlagRequired("server-command")
+	rootCmd.PersistentFlags().StringVarP(&flag.serverSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
@@ -31,11 +34,22 @@ var rootCmd = &cobra.Command{
 	Use:   os.Args[0],
 	Short: "Check Piping Server",
 	RunE: func(_ *cobra.Command, args []string) error {
-		checks := check.AllChecks()
-		config := check.Config{
+		var config check.Config
+		if flag.serverCommand != "" {
 			// TODO: sh -c
-			RunServerCmd: []string{"sh", "-c", flag.serverCommand},
+			config.RunServerCmd = []string{"sh", "-c", flag.serverCommand}
+		} else if flag.serverSchemalessUrl != "" {
+			_, err := url.Parse(flag.serverSchemalessUrl)
+			if err != nil || !strings.HasPrefix(flag.serverSchemalessUrl, "//") {
+				fmt.Fprintf(os.Stderr, "--server-schemaless-url should be like '//ppng.io'\n")
+				os.Exit(1)
+			}
+			config.ServerSchemalessUrl = flag.serverSchemalessUrl
+		} else {
+			fmt.Fprintf(os.Stderr, "Specify --server-command or --server-schemaless-url\n")
+			os.Exit(1)
 		}
+		checks := check.AllChecks()
 		var protocols []check.Protocol
 		if flag.http1_1 {
 			protocols = append(protocols, check.Http1_1)
@@ -91,6 +105,7 @@ func runChecks(checks []check.Check, config *check.Config, protocols []check.Pro
 					TlsSkipVerifyCert: flag.tlsSkipVerify,
 				}
 				// TODO: timeout for RunCheck considering long-time check
+				// TODO: Use AcceptedProtocols
 				check.RunCheck(&c, config, &subConfig, ch)
 			}
 		}

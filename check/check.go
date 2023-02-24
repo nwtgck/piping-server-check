@@ -28,7 +28,8 @@ const (
 
 type Config struct {
 	// $HTTP_PORT, $HTTPS_PORT
-	RunServerCmd []string
+	RunServerCmd        []string
+	ServerSchemalessUrl string
 }
 
 // TODO: name
@@ -236,6 +237,25 @@ func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stop
 
 	<-finishCh
 	return
+}
+
+func prepareServerUrl(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) (serverUrl string, ok bool, stopServerIfNeed func()) {
+	if config.ServerSchemalessUrl == "" {
+		var stopServer func()
+		var resultErrors []ResultError
+		serverUrl, stopServer, resultErrors = prepareServer(config, subConfig)
+		if len(resultErrors) != 0 {
+			runCheckResultCh <- RunCheckResult{Errors: resultErrors}
+			return
+		}
+		return serverUrl, true, stopServer
+	}
+	if protocolUsesTls(subConfig.Protocol) {
+		serverUrl = "https:" + config.ServerSchemalessUrl
+	} else {
+		serverUrl = "http:" + config.ServerSchemalessUrl
+	}
+	return serverUrl, true, func() {}
 }
 
 func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {

@@ -13,12 +13,11 @@ func post_first_byte_by_byte_streaming() Check {
 		AcceptedProtocols: []Protocol{Http1_1, H2, H2c},
 		run: func(config *Config, subConfig *SubConfig, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
-			serverUrl, stopServer, resultErrors := prepareServer(config, subConfig)
-			if len(resultErrors) != 0 {
-				runCheckResultCh <- RunCheckResult{Errors: resultErrors}
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, subConfig, runCheckResultCh)
+			if !ok {
 				return
 			}
-			defer stopServer()
+			defer stopServerIfNeed()
 
 			postHttpClient := httpProtocolToClient(subConfig.Protocol, subConfig.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
