@@ -47,7 +47,7 @@ func sendFirstRun(sendMethod string, config *Config, subConfig *SubConfig, runCh
 
 	contentType := "text/plain"
 	var getWroteRequest bool
-	postReqArrived := make(chan struct{})
+	postReqArrived := make(chan struct{}, 1)
 	postFinished := make(chan struct{})
 	go func() {
 		defer func() { postFinished <- struct{}{} }()
