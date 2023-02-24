@@ -30,9 +30,9 @@ func get_first() Check {
 
 			contentType := "text/plain"
 			getReqWroteRequest := make(chan bool)
-			getReqFinished := make(chan struct{})
+			getFinished := make(chan struct{})
 			go func() {
-				defer func() { getReqFinished <- struct{}{} }()
+				defer func() { getFinished <- struct{}{} }()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
@@ -104,7 +104,7 @@ func get_first() Check {
 				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
 				return
 			}
-			<-getReqFinished
+			<-getFinished
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
