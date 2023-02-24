@@ -1,6 +1,7 @@
 package check
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/nwtgck/piping-server-check/util"
@@ -58,7 +59,18 @@ func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Clien
 				TLSClientConfig: tlsConfig,
 			},
 		}
-	case H2, H2c:
+	case H2c:
+		return &http.Client{
+			// (base: https://github.com/thrawn01/h2c-golang-example/tree/cafa2960ca5df81100b61a1785b37f5ed749b87d)
+			Transport: &http2.Transport{
+				AllowHTTP:       true,
+				TLSClientConfig: tlsConfig,
+				DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+					return net.Dial(network, addr)
+				},
+			},
+		}
+	case H2:
 		return &http.Client{
 			Transport: &http2.Transport{
 				TLSClientConfig: tlsConfig,

@@ -18,6 +18,7 @@ var flag struct {
 	http1_1             bool
 	http1_1Tls          bool
 	h2                  bool
+	h2c                 bool
 }
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2, "h2", "", false, "HTTP/2 (TLS)")
+	rootCmd.PersistentFlags().BoolVarP(&flag.h2c, "h2c", "", false, "HTTP/2 cleartext")
 }
 
 var rootCmd = &cobra.Command{
@@ -59,6 +61,9 @@ var rootCmd = &cobra.Command{
 		}
 		if flag.h2 {
 			protocols = append(protocols, check.H2)
+		}
+		if flag.h2c {
+			protocols = append(protocols, check.H2c)
 		}
 		if len(protocols) == 0 {
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
