@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/nwtgck/piping-server-check/check"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	"net/url"
 	"os"
 	"strings"
@@ -13,14 +14,15 @@ import (
 )
 
 var flag struct {
-	serverCommand       string
-	serverSchemalessUrl string
-	tlsSkipVerify       bool
-	http1_1             bool
-	http1_1Tls          bool
-	h2                  bool
-	h2c                 bool
-	h3                  bool
+	serverCommand         string
+	serverSchemalessUrl   string
+	tlsSkipVerify         bool
+	http1_1               bool
+	http1_1Tls            bool
+	h2                    bool
+	h2c                   bool
+	h3                    bool
+	compromiseResultNames []string
 }
 
 func init() {
@@ -33,6 +35,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2, "h2", "", false, "HTTP/2 (TLS)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2c, "h2c", "", false, "HTTP/2 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h3, "h3", "", false, "HTTP/3")
+	rootCmd.PersistentFlags().StringArrayVarP(&flag.compromiseResultNames, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise put.transferred)")
 }
 
 var rootCmd = &cobra.Command{
@@ -83,7 +86,7 @@ var rootCmd = &cobra.Command{
 		config.GetResponseReceivedTimeout = 5 * time.Second
 		config.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
-		hasError := false
+		shouldExitWithNonZero := false
 		for result := range runChecks(checks, &config, protocols) {
 			jsonBytes, err := json.Marshal(&result)
 			if err != nil {
@@ -91,8 +94,12 @@ var rootCmd = &cobra.Command{
 			}
 			line := string(jsonBytes)
 			if len(result.Errors) != 0 {
-				hasError = true
-				line = color.RedString(fmt.Sprintf("✖︎ %s", line))
+				if slices.Contains(flag.compromiseResultNames, result.Name) {
+					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
+				} else {
+					shouldExitWithNonZero = true
+					line = color.RedString(fmt.Sprintf("✖︎ %s", line))
+				}
 			} else if len(result.Warnings) != 0 {
 				line = color.YellowString(fmt.Sprintf("⚠︎ %s", line))
 			} else {
@@ -100,7 +107,7 @@ var rootCmd = &cobra.Command{
 			}
 			fmt.Println(line)
 		}
-		if hasError {
+		if shouldExitWithNonZero {
 			os.Exit(1)
 		}
 		return nil
