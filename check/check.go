@@ -203,17 +203,16 @@ func prepareServer(config *Config, subConfig *SubConfig) (serverUrl string, stop
 
 	finishCh := make(chan struct{})
 	go func() {
-		var stderrString string
-		readStderr := make(chan struct{})
+		stderrStringCh := make(chan string)
 		go func() {
 			var buf [2048]byte
 			// err can be ignored because empty bytes will be an empty string
 			n, _ := io.ReadFull(stderr, buf[:])
-			stderrString = string(buf[:n])
-			readStderr <- struct{}{}
+			stderrString := string(buf[:n])
+			stderrStringCh <- stderrString
 		}()
 		err := cmd.Wait()
-		<-readStderr
+		stderrString := <-stderrStringCh
 		if err != nil {
 			resultErrors = append(resultErrors, NewError(fmt.Sprintf("%+v, stderr: %s", err, stderrString), err))
 		}
