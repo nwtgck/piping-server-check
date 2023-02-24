@@ -23,6 +23,7 @@ var flag struct {
 	h2c                   bool
 	h3                    bool
 	compromiseResultNames []string
+	concurrency           uint
 }
 
 func init() {
@@ -36,6 +37,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2c, "h2c", "", false, "HTTP/2 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h3, "h3", "", false, "HTTP/3")
 	rootCmd.PersistentFlags().StringArrayVarP(&flag.compromiseResultNames, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise put.transferred)")
+	rootCmd.PersistentFlags().UintVarP(&flag.concurrency, "concurrency", "", 1, "1 means running check one by one. 2 means that two checks run concurrently")
 }
 
 var rootCmd = &cobra.Command{
@@ -78,6 +80,7 @@ var rootCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
 		config.TlsSkipVerifyCert = flag.tlsSkipVerify
+		config.Concurrency = flag.concurrency
 		// TODO: to be option
 		config.SenderResponseBeforeReceiverTimeout = 5 * time.Second
 		// TODO: to be option
@@ -122,18 +125,38 @@ func main() {
 }
 
 func runChecks(checks []check.Check, commonConfig *check.Config, protocols []check.Protocol) <-chan check.Result {
+	if commonConfig.Concurrency < 1 {
+		panic("concurrency should be >= 1")
+	}
 	ch := make(chan check.Result)
+	resultChForRunCheckCh := make(chan chan check.Result, commonConfig.Concurrency-1)
+
 	go func() {
-		for _, c := range checks {
-			for _, protocol := range protocols {
-				config := *commonConfig
-				config.Protocol = protocol
-				// TODO: timeout for RunCheck considering long-time check
-				// TODO: Use AcceptedProtocols
-				check.RunCheck(&c, &config, ch)
+		for resultChForRunCheck := range resultChForRunCheckCh {
+			for result := range resultChForRunCheck {
+				ch <- result
 			}
 		}
 		close(ch)
+	}()
+
+	go func() {
+		for _, c := range checks {
+			for _, protocol := range protocols {
+				var resultChForRunCheck chan check.Result
+				resultChForRunCheck = make(chan check.Result)
+				resultChForRunCheckCh <- resultChForRunCheck
+				config := *commonConfig
+				config.Protocol = protocol
+				go func(c check.Check, config check.Config) {
+					// TODO: timeout for RunCheck considering long-time check
+					// TODO: Use AcceptedProtocols
+					check.RunCheck(&c, &config, resultChForRunCheck)
+					close(resultChForRunCheck)
+				}(c, config)
+			}
+		}
+		close(resultChForRunCheckCh)
 	}()
 	return ch
 }

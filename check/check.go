@@ -35,6 +35,7 @@ type Config struct {
 	ServerSchemalessUrl                 string
 	Protocol                            Protocol
 	TlsSkipVerifyCert                   bool
+	Concurrency                         uint
 	SenderResponseBeforeReceiverTimeout time.Duration
 	FirstByteCheckTimeout               time.Duration
 	GetResponseReceivedTimeout          time.Duration
