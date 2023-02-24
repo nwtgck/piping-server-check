@@ -207,7 +207,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
 	}
-	httpsPort, err := util.GetTCPPort()
+	httpsPort, err := util.GetTCPAndUDPPort()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return

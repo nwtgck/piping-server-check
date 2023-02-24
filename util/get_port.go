@@ -2,6 +2,7 @@ package util
 
 import (
 	"net"
+	"strconv"
 )
 
 func GetTCPPort() (string, error) {
@@ -17,4 +18,21 @@ func GetTCPPort() (string, error) {
 		return "", err
 	}
 	return port, nil
+}
+
+func GetTCPAndUDPPort() (string, error) {
+	for {
+		port, err := GetTCPPort()
+		if err != nil {
+			return "", err
+		}
+		portInt, _ := strconv.Atoi(port)
+		l, err := net.ListenUDP("udp", &net.UDPAddr{Port: portInt})
+		if err := l.Close(); err != nil {
+			return "", err
+		}
+		if err == nil {
+			return port, nil
+		}
+	}
 }
