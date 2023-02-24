@@ -89,10 +89,11 @@ func post_first_byte_by_byte_streaming() Check {
 					return
 				}
 				if byte(i) != buff[0] {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("different body: i=%d", i), nil))
+					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("different body: i=%d", i), nil)}}
 					return
 				}
 			}
+			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
 	}
