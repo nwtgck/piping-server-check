@@ -129,7 +129,7 @@ func runChecks(checks []check.Check, commonConfig *check.Config, protocols []che
 		panic("concurrency should be >= 1")
 	}
 	ch := make(chan check.Result)
-	resultChForRunCheckCh := make(chan chan check.Result, commonConfig.Concurrency-1)
+	resultChForRunCheckCh := make(chan (<-chan check.Result), commonConfig.Concurrency-1)
 
 	go func() {
 		for resultChForRunCheck := range resultChForRunCheckCh {
