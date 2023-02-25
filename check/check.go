@@ -20,13 +20,13 @@ import (
 type Protocol string
 
 const (
-	Http1_0     = Protocol("http1.0")
-	Http1_0_tls = Protocol("http1.0-tls")
-	Http1_1     = Protocol("http1.1")
-	Http1_1_tls = Protocol("http1.1-tls")
-	H2          = Protocol("h2")
-	H2c         = Protocol("h2c")
-	H3          = Protocol("h3")
+	ProtocolHttp1_0     = Protocol("http1.0")
+	ProtocolHttp1_0_tls = Protocol("http1.0-tls")
+	ProtocolHttp1_1     = Protocol("http1.1")
+	ProtocolHttp1_1_tls = Protocol("http1.1-tls")
+	ProtocolH2          = Protocol("h2")
+	ProtocolH2c         = Protocol("h2c")
+	ProtocolH3          = Protocol("h3")
 )
 
 type Config struct {
@@ -43,25 +43,25 @@ type Config struct {
 
 func protocolUsesTls(protocol Protocol) bool {
 	switch protocol {
-	case Http1_0_tls, Http1_1_tls, H2, H3:
+	case ProtocolHttp1_0_tls, ProtocolHttp1_1_tls, ProtocolH2, ProtocolH3:
 		return true
 	default:
 		return false
 	}
 }
 
-func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Client {
+func newHTTPClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Client {
 	tlsConfig := &tls.Config{InsecureSkipVerify: tlsSkipVerifyCert}
 	// TODO: impl
 	switch protocol {
-	//case Http1_0, Http1_0_tls:
-	case Http1_1, Http1_1_tls:
+	//case ProtocolHttp1_0, ProtocolHttp1_0_tls:
+	case ProtocolHttp1_1, ProtocolHttp1_1_tls:
 		return &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: tlsConfig,
 			},
 		}
-	case H2c:
+	case ProtocolH2c:
 		return &http.Client{
 			// (base: https://github.com/thrawn01/h2c-golang-example/tree/cafa2960ca5df81100b61a1785b37f5ed749b87d)
 			Transport: &http2.Transport{
@@ -72,13 +72,13 @@ func httpProtocolToClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Clien
 				},
 			},
 		}
-	case H2:
+	case ProtocolH2:
 		return &http.Client{
 			Transport: &http2.Transport{
 				TLSClientConfig: tlsConfig,
 			},
 		}
-	case H3:
+	case ProtocolH3:
 		return &http.Client{
 			Transport: &http3.RoundTripper{
 				TLSClientConfig: tlsConfig,
@@ -283,13 +283,13 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	var resultErrors []ResultError
 	var versionOk bool
 	switch expectedProto {
-	case Http1_0, Http1_0_tls:
+	case ProtocolHttp1_0, ProtocolHttp1_0_tls:
 		versionOk = resp.Proto == "HTTP/1.0"
-	case Http1_1, Http1_1_tls:
+	case ProtocolHttp1_1, ProtocolHttp1_1_tls:
 		versionOk = resp.Proto == "HTTP/1.1"
-	case H2, H2c:
+	case ProtocolH2, ProtocolH2c:
 		versionOk = resp.Proto == "HTTP/2.0"
-	case H3:
+	case ProtocolH3:
 		versionOk = resp.Proto == "HTTP/3.0"
 	}
 	if !versionOk {

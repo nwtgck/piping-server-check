@@ -19,9 +19,9 @@ func post_first_byte_by_byte_streaming() Check {
 			}
 			defer stopServerIfNeed()
 
-			postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+			postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
-			getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+			getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			url := serverUrl + "/" + path

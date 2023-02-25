@@ -35,9 +35,9 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	}
 	defer stopServerIfNeed()
 
-	postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+	postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer postHttpClient.CloseIdleConnections()
-	getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer getHttpClient.CloseIdleConnections()
 	path := uuid.NewString()
 	bodyString := "my message"

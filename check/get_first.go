@@ -20,9 +20,9 @@ func get_first() Check {
 			}
 			defer stopServerIfNeed()
 
-			postHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+			postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer postHttpClient.CloseIdleConnections()
-			getHttpClient := httpProtocolToClient(config.Protocol, config.TlsSkipVerifyCert)
+			getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
 			path := uuid.NewString()
 			bodyString := "my message"
@@ -81,7 +81,7 @@ func get_first() Check {
 				}
 			}()
 
-			if config.Protocol == H3 {
+			if config.Protocol == ProtocolH3 {
 				// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
 				runCheckResultCh <- RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. Ensuring GET-request-first is not supported in HTTP/3", nil)}}
 				time.Sleep(config.GetReqWroteRequestWaitForH3)

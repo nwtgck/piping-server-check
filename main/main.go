@@ -62,22 +62,22 @@ var rootCmd = &cobra.Command{
 		checks := check.AllChecks()
 		var protocols []check.Protocol
 		if flag.http1_1 {
-			protocols = append(protocols, check.Http1_1)
+			protocols = append(protocols, check.ProtocolHttp1_1)
 		}
 		if flag.http1_1Tls {
-			protocols = append(protocols, check.Http1_1_tls)
+			protocols = append(protocols, check.ProtocolHttp1_1_tls)
 		}
 		if flag.h2 {
-			protocols = append(protocols, check.H2)
+			protocols = append(protocols, check.ProtocolH2)
 		}
 		if flag.h2c {
-			protocols = append(protocols, check.H2c)
+			protocols = append(protocols, check.ProtocolH2c)
 		}
 		if flag.h3 {
-			protocols = append(protocols, check.H3)
+			protocols = append(protocols, check.ProtocolH3)
 		}
 		if len(protocols) == 0 {
-			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
+			fmt.Fprintf(os.Stderr, "Specify --http1.1, --http1.1-tls or other protocols to check\n")
 		}
 		commonConfig.TlsSkipVerifyCert = flag.tlsSkipVerify
 		commonConfig.Concurrency = flag.concurrency

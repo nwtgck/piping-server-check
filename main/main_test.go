@@ -29,7 +29,7 @@ func TestRunServerCommandFailed(t *testing.T) {
 		RunServerCmd: []string{"sh", "-c", "echo 'error on purpose' > /dev/stderr && exit 1"},
 		Concurrency:  1,
 	}
-	protocols := []check.Protocol{check.Http1_1}
+	protocols := []check.Protocol{check.ProtocolHttp1_1}
 	for result := range runChecks(checks, &config, protocols) {
 		assert.NotNil(t, result.Errors)
 		assert.Contains(t, result.Errors[0].Message, "error on purpose")
@@ -45,7 +45,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
 	}
-	protocols := []check.Protocol{check.Http1_1}
+	protocols := []check.Protocol{check.ProtocolHttp1_1}
 	var results []check.Result
 	for result := range runChecks(checks, &config, protocols) {
 		results = append(results, result)
@@ -53,18 +53,18 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 	truePointer := new(bool)
 	*truePointer = true
 	expected := []check.Result{
-		{Name: "post_first.sender_response_before_receiver", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "post_first.content_type_forwarding", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "post_first.x_robots_tag_none", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "post_first.transferred", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "get_first.content_type_forwarding", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "get_first.x_robots_tag_none", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "get_first.transferred", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "put.sender_response_before_receiver", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "put.content_type_forwarding", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "put.x_robots_tag_none", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "put.transferred", Protocol: check.Http1_1, OkForJson: truePointer},
-		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: check.Http1_1, OkForJson: truePointer},
+		{Name: "post_first.sender_response_before_receiver", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first.content_type_forwarding", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first.x_robots_tag_none", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first.transferred", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "get_first.content_type_forwarding", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "get_first.x_robots_tag_none", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "get_first.transferred", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "put.sender_response_before_receiver", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "put.content_type_forwarding", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "put.x_robots_tag_none", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "put.transferred", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: check.ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }
@@ -79,21 +79,21 @@ func TestRunChecksForH2C(t *testing.T) {
 		FirstByteCheckTimeout:               100 * time.Millisecond,
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
 	}
-	protocols := []check.Protocol{check.H2c}
+	protocols := []check.Protocol{check.ProtocolH2c}
 	var errorResultNames []string
-	var warningCheckNames []string
+	var warningResultNames []string
 	for result := range runChecks(checks, &config, protocols) {
 		if len(result.Errors) != 0 {
 			errorResultNames = append(errorResultNames, result.Name)
 		}
 		if len(result.Warnings) != 0 {
-			warningCheckNames = append(warningCheckNames, result.Name)
+			warningResultNames = append(warningResultNames, result.Name)
 		}
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_first_byte_by_byte_streaming",
 	})
-	assert.ElementsMatch(t, warningCheckNames, []string{
+	assert.ElementsMatch(t, warningResultNames, []string{
 		"post_first.sender_response_before_receiver",
 		"put.sender_response_before_receiver",
 	})
@@ -115,7 +115,7 @@ func TestRunChecksForH3(t *testing.T) {
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
 		GetReqWroteRequestWaitForH3:         0,
 	}
-	protocols := []check.Protocol{check.H3}
+	protocols := []check.Protocol{check.ProtocolH3}
 	var errorResultNames []string
 	var warningResultNames []string
 	for result := range runChecks(checks, &config, protocols) {
