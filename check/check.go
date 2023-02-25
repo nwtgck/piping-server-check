@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -237,7 +238,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 	}()
 
 	stopSerer = func() {
-		cmd.Process.Signal(os.Interrupt)
+		cmd.Process.Signal(syscall.SIGTERM)
 	}
 	serverPort := httpPort
 	if protocolUsesTls(config.Protocol) {
