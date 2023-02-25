@@ -39,7 +39,7 @@ func TestRunServerCommandFailed(t *testing.T) {
 func TestRunChecksForHTTP1_1(t *testing.T) {
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", pipingServerPkg1_12_8Path)},
+		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", pipingServerPkg1_12_8Path)},
 		Concurrency:                         10,
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
@@ -72,7 +72,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 func TestRunChecksForH2C(t *testing.T) {
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT", goPipingServer0_4_0Path)},
+		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", goPipingServer0_4_0Path)},
 		Concurrency:  10,
 		// Short timeouts are OK because the checks are always timeout when they are long
 		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
@@ -106,7 +106,7 @@ func TestRunChecksForH3(t *testing.T) {
 	}
 	checks := check.AllChecks()
 	config := check.Config{
-		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("%s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_4_0Path, keyPath, certPath)},
+		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_4_0Path, keyPath, certPath)},
 		TlsSkipVerifyCert: true,
 		Concurrency:       10,
 		// Short timeouts are OK because the checks are always timeout when they are long
