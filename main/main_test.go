@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	_ "github.com/k0kubun/pp/v3" // Not used but do not remove. It is useful to create tests
 	"github.com/nwtgck/piping-server-check/check"
 	"github.com/stretchr/testify/assert"
 	"testing"
