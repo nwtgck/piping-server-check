@@ -28,7 +28,7 @@ var flag struct {
 
 func init() {
 	cobra.OnInitialize()
-	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server")
+	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT in command")
 	rootCmd.PersistentFlags().StringVarP(&flag.serverSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
@@ -44,17 +44,17 @@ var rootCmd = &cobra.Command{
 	Use:   os.Args[0],
 	Short: "Check Piping Server",
 	RunE: func(_ *cobra.Command, args []string) error {
-		var config check.Config
+		var commonConfig check.Config
 		if flag.serverCommand != "" {
 			// TODO: sh -c
-			config.RunServerCmd = []string{"sh", "-c", flag.serverCommand}
+			commonConfig.RunServerCmd = []string{"sh", "-c", flag.serverCommand}
 		} else if flag.serverSchemalessUrl != "" {
 			_, err := url.Parse(flag.serverSchemalessUrl)
 			if err != nil || !strings.HasPrefix(flag.serverSchemalessUrl, "//") {
 				fmt.Fprintf(os.Stderr, "--server-schemaless-url should be like '//ppng.io'\n")
 				os.Exit(1)
 			}
-			config.ServerSchemalessUrl = flag.serverSchemalessUrl
+			commonConfig.ServerSchemalessUrl = flag.serverSchemalessUrl
 		} else {
 			fmt.Fprintf(os.Stderr, "Specify --server-command or --server-schemaless-url\n")
 			os.Exit(1)
@@ -79,18 +79,18 @@ var rootCmd = &cobra.Command{
 		if len(protocols) == 0 {
 			fmt.Fprintf(os.Stderr, "Specify --http1.1 or --http1.1-tls to check\n")
 		}
-		config.TlsSkipVerifyCert = flag.tlsSkipVerify
-		config.Concurrency = flag.concurrency
+		commonConfig.TlsSkipVerifyCert = flag.tlsSkipVerify
+		commonConfig.Concurrency = flag.concurrency
 		// TODO: to be option
-		config.SenderResponseBeforeReceiverTimeout = 5 * time.Second
+		commonConfig.SenderResponseBeforeReceiverTimeout = 5 * time.Second
 		// TODO: to be option
-		config.FirstByteCheckTimeout = 5 * time.Second
+		commonConfig.FirstByteCheckTimeout = 5 * time.Second
 		// TODO: to be option
-		config.GetResponseReceivedTimeout = 5 * time.Second
-		config.GetReqWroteRequestWaitForH3 = 3 * time.Second
+		commonConfig.GetResponseReceivedTimeout = 5 * time.Second
+		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
 		shouldExitWithNonZero := false
-		for result := range runChecks(checks, &config, protocols) {
+		for result := range runChecks(checks, &commonConfig, protocols) {
 			jsonBytes, err := json.Marshal(&result)
 			if err != nil {
 				return err
@@ -150,7 +150,6 @@ func runChecks(checks []check.Check, commonConfig *check.Config, protocols []che
 				config.Protocol = protocol
 				go func(c check.Check, config check.Config) {
 					// TODO: timeout for RunCheck considering long-time check
-					// TODO: Use AcceptedProtocols
 					check.RunCheck(&c, &config, resultChForRunCheck)
 					close(resultChForRunCheck)
 				}(c, config)

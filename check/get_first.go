@@ -11,8 +11,7 @@ import (
 
 func get_first() Check {
 	return Check{
-		Name:              checkName(),
-		AcceptedProtocols: []Protocol{Http1_0, Http1_1, H2, H2c},
+		Name: getCheckName(),
 		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
 			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)

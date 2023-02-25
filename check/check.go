@@ -30,7 +30,6 @@ const (
 )
 
 type Config struct {
-	// $HTTP_PORT, $HTTPS_PORT
 	RunServerCmd                        []string
 	ServerSchemalessUrl                 string
 	Protocol                            Protocol
@@ -132,6 +131,7 @@ func XRobotsTagNoneWarning(actualValue string) ResultWarning {
 }
 
 type Result struct {
+	// result name can be "<check name>.<subcheck name>" or "<check name>"
 	Name      string          `json:"name"`
 	Protocol  Protocol        `json:"protocol"`
 	OkForJson *bool           `json:"ok,omitempty"`
@@ -160,12 +160,11 @@ func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
 }
 
 type Check struct {
-	Name              string
-	AcceptedProtocols []Protocol
-	run               func(config *Config, runCheckResultCh chan<- RunCheckResult)
+	Name string
+	run  func(config *Config, runCheckResultCh chan<- RunCheckResult)
 }
 
-func checkName() string {
+func getCheckName() string {
 	counter, _, _, success := runtime.Caller(1)
 	if !success {
 		panic(fmt.Errorf("failed to run runtime.Caller()"))
@@ -253,6 +252,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 
 	go func() {
 		waitTCPServer(httpAddress)
+		// TODO: wait UDP server for HTTP/3
 		finishCh <- struct{}{}
 	}()
 

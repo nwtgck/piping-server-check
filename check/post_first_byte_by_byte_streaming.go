@@ -10,8 +10,7 @@ import (
 
 func post_first_byte_by_byte_streaming() Check {
 	return Check{
-		Name:              checkName(),
-		AcceptedProtocols: []Protocol{Http1_1, H2, H2c},
+		Name: getCheckName(),
 		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
 			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
