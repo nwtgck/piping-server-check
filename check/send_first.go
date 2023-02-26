@@ -45,7 +45,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 
 	contentType := "text/plain"
 	var getWroteRequest bool
-	postReqArrived := make(chan struct{}, 1)
+	postRespArrived := make(chan struct{}, 1)
 	postFinished := make(chan struct{})
 	go func() {
 		defer func() { postFinished <- struct{}{} }()
@@ -60,7 +60,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
 			return
 		}
-		postReqArrived <- struct{}{}
+		postRespArrived <- struct{}{}
 		if getWroteRequest {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
 		} else {
@@ -76,7 +76,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	}()
 
 	select {
-	case <-postReqArrived:
+	case <-postRespArrived:
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 

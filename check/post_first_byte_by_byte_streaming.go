@@ -26,7 +26,7 @@ func post_first_byte_by_byte_streaming() Check {
 			path := uuid.NewString()
 			url := serverUrl + "/" + path
 
-			postReqArrived := make(chan struct{}, 1)
+			postRespArrived := make(chan struct{}, 1)
 			postFinished := make(chan struct{})
 			pr, pw := io.Pipe()
 			go func() {
@@ -41,7 +41,7 @@ func post_first_byte_by_byte_streaming() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
 					return
 				}
-				postReqArrived <- struct{}{}
+				postRespArrived <- struct{}{}
 				if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
 					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 				}
@@ -57,7 +57,7 @@ func post_first_byte_by_byte_streaming() Check {
 			}()
 
 			select {
-			case <-postReqArrived:
+			case <-postRespArrived:
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
