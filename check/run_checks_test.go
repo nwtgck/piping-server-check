@@ -89,6 +89,7 @@ func TestRunChecksForH2C(t *testing.T) {
 		if len(result.Warnings) != 0 {
 			warningResultNames = append(warningResultNames, result.Name)
 		}
+		assert.Equal(t, ProtocolH2c, result.Protocol)
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_first_byte_by_byte_streaming",
@@ -125,6 +126,7 @@ func TestRunChecksForH3(t *testing.T) {
 		if len(result.Warnings) != 0 {
 			warningResultNames = append(warningResultNames, result.Name)
 		}
+		assert.Equal(t, ProtocolH3, result.Protocol)
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_first_byte_by_byte_streaming",
