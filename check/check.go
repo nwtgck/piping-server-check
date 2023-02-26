@@ -306,15 +306,6 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	return resultErrors
 }
 
-func AllChecks() []Check {
-	return []Check{
-		post_first(),
-		get_first(),
-		put(),
-		post_first_byte_by_byte_streaming(),
-	}
-}
-
 func RunCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {
