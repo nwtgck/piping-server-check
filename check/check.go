@@ -306,7 +306,7 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	return resultErrors
 }
 
-func RunCheck(c *Check, config *Config, resultCh chan<- Result) {
+func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {
 		c.run(config, runCheckResultCh)
@@ -327,4 +327,40 @@ func RunCheck(c *Check, config *Config, resultCh chan<- Result) {
 		}
 		resultCh <- result
 	}
+}
+
+func RunChecks(checks []Check, commonConfig *Config, protocols []Protocol) <-chan Result {
+	if commonConfig.Concurrency < 1 {
+		panic("concurrency should be >= 1")
+	}
+	ch := make(chan Result)
+	resultChForRunCheckCh := make(chan (<-chan Result), commonConfig.Concurrency-1)
+
+	go func() {
+		for resultChForRunCheck := range resultChForRunCheckCh {
+			for result := range resultChForRunCheck {
+				ch <- result
+			}
+		}
+		close(ch)
+	}()
+
+	go func() {
+		for _, c := range checks {
+			for _, protocol := range protocols {
+				var resultChForRunCheck chan Result
+				resultChForRunCheck = make(chan Result)
+				resultChForRunCheckCh <- resultChForRunCheck
+				config := *commonConfig
+				config.Protocol = protocol
+				go func(c Check, config Config) {
+					// TODO: timeout for runCheck considering long-time check
+					runCheck(&c, &config, resultChForRunCheck)
+					close(resultChForRunCheck)
+				}(c, config)
+			}
+		}
+		close(resultChForRunCheckCh)
+	}()
+	return ch
 }

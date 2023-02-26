@@ -90,7 +90,7 @@ var rootCmd = &cobra.Command{
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
 		shouldExitWithNonZero := false
-		for result := range runChecks(checks, &commonConfig, protocols) {
+		for result := range check.RunChecks(checks, &commonConfig, protocols) {
 			jsonBytes, err := json.Marshal(&result)
 			if err != nil {
 				return err
@@ -122,40 +122,4 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(-1)
 	}
-}
-
-func runChecks(checks []check.Check, commonConfig *check.Config, protocols []check.Protocol) <-chan check.Result {
-	if commonConfig.Concurrency < 1 {
-		panic("concurrency should be >= 1")
-	}
-	ch := make(chan check.Result)
-	resultChForRunCheckCh := make(chan (<-chan check.Result), commonConfig.Concurrency-1)
-
-	go func() {
-		for resultChForRunCheck := range resultChForRunCheckCh {
-			for result := range resultChForRunCheck {
-				ch <- result
-			}
-		}
-		close(ch)
-	}()
-
-	go func() {
-		for _, c := range checks {
-			for _, protocol := range protocols {
-				var resultChForRunCheck chan check.Result
-				resultChForRunCheck = make(chan check.Result)
-				resultChForRunCheckCh <- resultChForRunCheck
-				config := *commonConfig
-				config.Protocol = protocol
-				go func(c check.Check, config check.Config) {
-					// TODO: timeout for RunCheck considering long-time check
-					check.RunCheck(&c, &config, resultChForRunCheck)
-					close(resultChForRunCheck)
-				}(c, config)
-			}
-		}
-		close(resultChForRunCheckCh)
-	}()
-	return ch
 }
