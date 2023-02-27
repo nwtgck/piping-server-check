@@ -141,6 +141,7 @@ func downloadGoPipingServerIfNotCached(version string) (binPath string, err erro
 	return
 }
 
+// TODO: add clean-up-file function
 func createKeyAndCert() (string, string, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

@@ -61,6 +61,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			return
 		}
 		postRespArrived <- struct{}{}
+		// TODO: not subcheck in HTTP/1.0
 		if getWroteRequest {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
 		} else {

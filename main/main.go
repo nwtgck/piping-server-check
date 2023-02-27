@@ -17,6 +17,8 @@ var flag struct {
 	serverCommand         string
 	serverSchemalessUrl   string
 	tlsSkipVerify         bool
+	http1_0               bool
+	http1_0Tls            bool
 	http1_1               bool
 	http1_1Tls            bool
 	h2                    bool
@@ -31,6 +33,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flag.serverCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT in command")
 	rootCmd.PersistentFlags().StringVarP(&flag.serverSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.tlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
+	rootCmd.PersistentFlags().BoolVarP(&flag.http1_0, "http1.0", "", false, "HTTP/1.0 cleartext")
+	rootCmd.PersistentFlags().BoolVarP(&flag.http1_0Tls, "http1.0-tls", "", false, "HTTP/1.0 over TLS")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1, "http1.1", "", false, "HTTP/1.1 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.http1_1Tls, "http1.1-tls", "", false, "HTTP/1.1 over TLS")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2, "h2", "", false, "HTTP/2 (TLS)")
@@ -61,6 +65,12 @@ var rootCmd = &cobra.Command{
 		}
 		checks := check.AllChecks()
 		var protocols []check.Protocol
+		if flag.http1_0 {
+			protocols = append(protocols, check.ProtocolHttp1_0)
+		}
+		if flag.http1_0Tls {
+			protocols = append(protocols, check.ProtocolHttp1_0_tls)
+		}
 		if flag.http1_1 {
 			protocols = append(protocols, check.ProtocolHttp1_1)
 		}
@@ -90,6 +100,7 @@ var rootCmd = &cobra.Command{
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
 		shouldExitWithNonZero := false
+		// TODO: output version
 		for result := range check.RunChecks(checks, &commonConfig, protocols) {
 			jsonBytes, err := json.Marshal(&result)
 			if err != nil {

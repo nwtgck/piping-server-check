@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
 	"time"
@@ -13,6 +14,10 @@ func post_first_byte_by_byte_streaming() Check {
 		Name: getCheckName(),
 		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
+			if slices.Contains([]Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}, config.Protocol) {
+				// Skip because HTTP/1.0 has not chunked encoding
+				return
+			}
 			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
 			if !ok {
 				return

@@ -36,6 +36,43 @@ func TestRunServerCommandFailed(t *testing.T) {
 	}
 }
 
+func TestRunChecksForHTTP1_0(t *testing.T) {
+	keyPath, certPath, err := createKeyAndCert()
+	if err != nil {
+		panic(err)
+	}
+	checks := AllChecks()
+	config := Config{
+		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s", pipingServerPkg1_12_8Path, keyPath, certPath)},
+		Concurrency:                         10,
+		TlsSkipVerifyCert:                   true,
+		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
+		FirstByteCheckTimeout:               1 * time.Second,
+		GetResponseReceivedTimeout:          1 * time.Second,
+	}
+	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
+	var errorResultNames []string
+	var warningResultNames []string
+	var results []Result
+	for result := range RunChecks(checks, &config, protocols) {
+		results = append(results, result)
+		if len(result.Errors) != 0 {
+			errorResultNames = append(errorResultNames, result.Name)
+		}
+		if len(result.Warnings) != 0 {
+			warningResultNames = append(warningResultNames, result.Name)
+		}
+		assert.Contains(t, []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}, result.Protocol)
+	}
+	assert.ElementsMatch(t, []string{}, errorResultNames)
+	assert.Equal(t, []string{
+		"post_first.sender_response_before_receiver",
+		"post_first.sender_response_before_receiver",
+		"put.sender_response_before_receiver",
+		"put.sender_response_before_receiver",
+	}, warningResultNames)
+}
+
 func TestRunChecksForHTTP1_1(t *testing.T) {
 	checks := AllChecks()
 	config := Config{

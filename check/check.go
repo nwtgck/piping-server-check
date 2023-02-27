@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/nwtgck/piping-server-check/http10_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/net/http2"
@@ -55,7 +56,12 @@ func newHTTPClient(protocol Protocol, tlsSkipVerifyCert bool) *http.Client {
 	tlsConfig := &tls.Config{InsecureSkipVerify: tlsSkipVerifyCert}
 	// TODO: impl
 	switch protocol {
-	//case ProtocolHttp1_0, ProtocolHttp1_0_tls:
+	case ProtocolHttp1_0, ProtocolHttp1_0_tls:
+		return &http.Client{
+			Transport: &http10_round_tripper.Http10RoundTripper{
+				TLSClientConfig: tlsConfig,
+			},
+		}
 	case ProtocolHttp1_1, ProtocolHttp1_1_tls:
 		return &http.Client{
 			Transport: &http.Transport{
