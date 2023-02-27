@@ -71,13 +71,7 @@ func (rt Http10RoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 		})
 	}
 
-	pr, pw := io.Pipe()
-	go func() {
-		// TODO: error handling
-		io.Copy(pw, conn)
-	}()
-
-	resp, err := http.ReadResponse(bufio.NewReader(pr), req)
+	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		return nil, err
 	}
