@@ -37,10 +37,11 @@ func TestRunServerCommandFailed(t *testing.T) {
 }
 
 func TestRunChecksForHTTP1_0(t *testing.T) {
-	keyPath, certPath, err := createKeyAndCert()
+	keyPath, certPath, removeKeyAndCert, err := createKeyAndCert()
 	if err != nil {
 		panic(err)
 	}
+	defer removeKeyAndCert()
 	checks := AllChecks()
 	config := Config{
 		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s", pipingServerPkg1_12_8Path, keyPath, certPath)},
@@ -138,10 +139,11 @@ func TestRunChecksForH2C(t *testing.T) {
 }
 
 func TestRunChecksForH3(t *testing.T) {
-	keyPath, certPath, err := createKeyAndCert()
+	keyPath, certPath, removeKeyAndCert, err := createKeyAndCert()
 	if err != nil {
 		panic(err)
 	}
+	defer removeKeyAndCert()
 	checks := AllChecks()
 	config := Config{
 		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_4_0Path, keyPath, certPath)},

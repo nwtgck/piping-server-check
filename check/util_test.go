@@ -141,34 +141,37 @@ func downloadGoPipingServerIfNotCached(version string) (binPath string, err erro
 	return
 }
 
-// TODO: add clean-up-file function
-func createKeyAndCert() (string, string, error) {
+func createKeyAndCert() (string, string, func(), error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	template := x509.Certificate{SerialNumber: big.NewInt(1)}
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	keyFile, err := os.CreateTemp(os.TempDir(), "key-")
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	defer keyFile.Close()
 	keyPem := pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}
 	if err := pem.Encode(keyFile, &keyPem); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	certFile, err := os.CreateTemp(os.TempDir(), "cert-")
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	defer certFile.Close()
 	certPem := pem.Block{Type: "CERTIFICATE", Bytes: derBytes}
 	if err := pem.Encode(certFile, &certPem); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
-	return keyFile.Name(), certFile.Name(), nil
+	removeKeyAndCert := func() {
+		os.Remove(keyFile.Name())
+		os.Remove(certFile.Name())
+	}
+	return keyFile.Name(), certFile.Name(), removeKeyAndCert, nil
 }
