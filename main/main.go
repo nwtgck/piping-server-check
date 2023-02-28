@@ -26,6 +26,7 @@ var flag struct {
 	h3                    bool
 	compromiseResultNames []string
 	concurrency           uint
+	resultJSONLPath       string
 }
 
 func init() {
@@ -42,6 +43,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.h3, "h3", "", false, "HTTP/3")
 	rootCmd.PersistentFlags().StringArrayVarP(&flag.compromiseResultNames, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise put.transferred)")
 	rootCmd.PersistentFlags().UintVarP(&flag.concurrency, "concurrency", "", 1, "1 means running check one by one. 2 means that two checks run concurrently")
+	rootCmd.PersistentFlags().StringVarP(&flag.resultJSONLPath, "result-jsonl-path", "", "", "output file path of result JSONL")
 }
 
 var rootCmd = &cobra.Command{
@@ -100,6 +102,7 @@ var rootCmd = &cobra.Command{
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
 		shouldExitWithNonZero := false
+		var jsonlBytes []byte
 		// TODO: output version
 		for result := range check.RunChecks(checks, &commonConfig, protocols) {
 			jsonBytes, err := json.Marshal(&result)
@@ -107,6 +110,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			line := string(jsonBytes)
+			jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
 			if len(result.Errors) != 0 {
 				if slices.Contains(flag.compromiseResultNames, result.Name) {
 					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
@@ -120,6 +124,12 @@ var rootCmd = &cobra.Command{
 				line = color.GreenString(fmt.Sprintf("✔︎ %s", line))
 			}
 			fmt.Println(line)
+		}
+		if flag.resultJSONLPath != "" {
+			err := os.WriteFile(flag.resultJSONLPath, jsonlBytes, 0644)
+			if err != nil {
+				return err
+			}
 		}
 		if shouldExitWithNonZero {
 			os.Exit(1)
