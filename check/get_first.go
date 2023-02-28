@@ -29,7 +29,8 @@ func get_first() Check {
 			url := serverUrl + "/" + path
 
 			contentType := "text/plain"
-			getReqWroteRequest := make(chan bool)
+			getReqWroteRequestCh := make(chan struct{})
+			getReqFailedCh := make(chan struct{})
 			getFinished := make(chan struct{})
 			go func() {
 				defer func() { getFinished <- struct{}{} }()
@@ -40,13 +41,12 @@ func get_first() Check {
 				}
 				getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
 					WroteRequest: func(info httptrace.WroteRequestInfo) {
-						getReqWroteRequest <- true
-						close(getReqWroteRequest)
+						getReqWroteRequestCh <- struct{}{}
 					},
 				}))
 				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
 				if !getOk {
-					getReqWroteRequest <- false
+					getReqFailedCh <- struct{}{}
 					return
 				}
 				receivedContentType := getResp.Header.Get("Content-Type")
@@ -78,7 +78,9 @@ func get_first() Check {
 				time.Sleep(config.GetReqWroteRequestWaitForH3)
 			} else {
 				// Wait for the GET request
-				if ok := <-getReqWroteRequest; !ok {
+				select {
+				case <-getReqWroteRequestCh:
+				case <-getReqFailedCh:
 					return
 				}
 			}
