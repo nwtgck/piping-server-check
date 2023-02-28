@@ -46,6 +46,7 @@ func get_first() Check {
 				}))
 				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
 				if !getOk {
+					getReqWroteRequest <- false
 					return
 				}
 				receivedContentType := getResp.Header.Get("Content-Type")
