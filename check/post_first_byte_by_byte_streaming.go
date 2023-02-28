@@ -28,8 +28,8 @@ func post_first_byte_by_byte_streaming() Check {
 			defer postHttpClient.CloseIdleConnections()
 			getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 			defer getHttpClient.CloseIdleConnections()
-			path := uuid.NewString()
-			url := serverUrl + "/" + path
+			path := "/" + uuid.NewString()
+			url := serverUrl + path
 
 			postRespArrived := make(chan struct{}, 1)
 			postFinished := make(chan struct{})

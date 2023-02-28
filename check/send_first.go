@@ -39,9 +39,9 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	defer postHttpClient.CloseIdleConnections()
 	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer getHttpClient.CloseIdleConnections()
-	path := uuid.NewString()
+	path := "/" + uuid.NewString()
 	bodyString := "my message"
-	url := serverUrl + "/" + path
+	url := serverUrl + path
 
 	contentType := "text/plain"
 	var getWroteRequest bool
