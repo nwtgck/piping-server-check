@@ -73,17 +73,16 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 
-	getTrace := &httptrace.ClientTrace{
-		WroteRequest: func(info httptrace.WroteRequestInfo) {
-			getWroteRequest = true
-		},
-	}
 	getReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
 		return
 	}
-	getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), getTrace))
+	getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			getWroteRequest = true
+		},
+	}))
 	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
 	if !getOk {
 		return

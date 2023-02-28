@@ -38,13 +38,12 @@ func get_first() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
 					return
 				}
-				clientTrace := &httptrace.ClientTrace{
+				getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
 					WroteRequest: func(info httptrace.WroteRequestInfo) {
 						getReqWroteRequest <- true
 						close(getReqWroteRequest)
 					},
-				}
-				getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), clientTrace))
+				}))
 				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
 				if !getOk {
 					return
