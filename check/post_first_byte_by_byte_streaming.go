@@ -41,19 +41,11 @@ func post_first_byte_by_byte_streaming() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 					return
 				}
-				postResp, err := postHttpClient.Do(postReq)
-				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
+				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+				if !postOk {
 					return
 				}
 				postRespArrived <- struct{}{}
-				if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-				}
-				if postResp.StatusCode != 200 {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
-					return
-				}
 				// Need to send one byte to GET
 				if _, err := pw.Write([]byte{0}); err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to send request body", err))
@@ -76,19 +68,12 @@ func post_first_byte_by_byte_streaming() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 					return
 				}
-				getResp, err = getHttpClient.Do(getReq)
+				var getOk bool
+				getResp, getOk = sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				if !getOk {
+					return
+				}
 				getResponseReceived <- struct{}{}
-				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
-					return
-				}
-				if resultErrors := checkProtocol(getResp, config.Protocol); len(resultErrors) != 0 {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-				}
-				if getResp.StatusCode != 200 {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
-					return
-				}
 			}()
 
 			select {

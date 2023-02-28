@@ -312,6 +312,22 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	return resultErrors
 }
 
+func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Protocol, runCheckResultCh chan<- RunCheckResult) (*http.Response, bool) {
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", req.Method), err))
+		return nil, false
+	}
+	if resultErrors := checkProtocol(resp, protocol); len(resultErrors) != 0 {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+	}
+	if resp.StatusCode != 200 {
+		runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode))
+		return nil, false
+	}
+	return resp, true
+}
+
 func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {

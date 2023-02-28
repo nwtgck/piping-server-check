@@ -45,17 +45,8 @@ func get_first() Check {
 					},
 				}
 				getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), clientTrace))
-				getResp, err := getHttpClient.Do(getReq)
-				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to get", err))
-					getReqWroteRequest <- false
-					return
-				}
-				if resultErrors := checkProtocol(getResp, config.Protocol); len(resultErrors) != 0 {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-				}
-				if getResp.StatusCode != 200 {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(getResp.StatusCode))
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				if !getOk {
 					return
 				}
 				receivedContentType := getResp.Header.Get("Content-Type")
@@ -98,16 +89,8 @@ func get_first() Check {
 				return
 			}
 			postReq.Header.Set("Content-Type", contentType)
-			postResp, err := postHttpClient.Do(postReq)
-			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to post", err))
-				return
-			}
-			if resultErrors := checkProtocol(postResp, config.Protocol); len(resultErrors) != 0 {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-			}
-			if postResp.StatusCode != 200 {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(postResp.StatusCode))
+			_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+			if !postOk {
 				return
 			}
 			<-getFinished
