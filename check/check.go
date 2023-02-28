@@ -328,6 +328,24 @@ func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Prot
 	return resp, true
 }
 
+func checkContentTypeForwarding(getResp *http.Response, expectedContentType string, runCheckResultCh chan<- RunCheckResult) {
+	receivedContentType := getResp.Header.Get("Content-Type")
+	if receivedContentType == expectedContentType {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
+	} else {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}}
+	}
+}
+
+func checkXRobotsTag(getResp *http.Response, runCheckResultCh chan<- RunCheckResult) {
+	receivedXRobotsTag := getResp.Header.Get("X-Robots-Tag")
+	if receivedXRobotsTag == "none" {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone}
+	} else {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
+	}
+}
+
 func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {

@@ -49,18 +49,8 @@ func get_first() Check {
 					getReqFailedCh <- struct{}{}
 					return
 				}
-				receivedContentType := getResp.Header.Get("Content-Type")
-				if receivedContentType == contentType {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
-				} else {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(contentType, receivedContentType)}}
-				}
-				receivedXRobotsTag := getResp.Header.Get("X-Robots-Tag")
-				if receivedXRobotsTag == "none" {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone}
-				} else {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
-				}
+				checkContentTypeForwarding(getResp, contentType, runCheckResultCh)
+				checkXRobotsTag(getResp, runCheckResultCh)
 				bodyBytes, err := io.ReadAll(getResp.Body)
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read up", err))
