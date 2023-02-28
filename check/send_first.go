@@ -45,7 +45,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 
 	contentType := "text/plain"
 	var getWroteRequest bool
-	postRespArrived := make(chan struct{}, 1)
+	postRespCh := make(chan *http.Response, 1)
 	postFinished := make(chan struct{})
 	go func() {
 		defer func() { postFinished <- struct{}{} }()
@@ -55,7 +55,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			return
 		}
 		postReq.Header.Set("Content-Type", contentType)
-		_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+		postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
 		if !postOk {
 			return
 		}
@@ -65,11 +65,11 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 		} else {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
 		}
-		postRespArrived <- struct{}{}
+		postRespCh <- postResp
 	}()
 
 	select {
-	case <-postRespArrived:
+	case <-postRespCh:
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 

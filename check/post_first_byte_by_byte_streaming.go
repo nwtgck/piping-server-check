@@ -58,8 +58,7 @@ func post_first_byte_by_byte_streaming() Check {
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			var getResp *http.Response
-			getResponseReceived := make(chan struct{})
+			getRespCh := make(chan *http.Response)
 			getFinished := make(chan struct{})
 			go func() {
 				defer func() { getFinished <- struct{}{} }()
@@ -68,16 +67,16 @@ func post_first_byte_by_byte_streaming() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 					return
 				}
-				var getOk bool
-				getResp, getOk = sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
 				if !getOk {
 					return
 				}
-				getResponseReceived <- struct{}{}
+				getRespCh <- getResp
 			}()
 
+			var getResp *http.Response
 			select {
-			case <-getResponseReceived:
+			case getResp = <-getRespCh:
 			case <-time.After(config.GetResponseReceivedTimeout):
 				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
 				return
