@@ -102,6 +102,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.x_robots_tag_none", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
