@@ -100,5 +100,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	}
 	<-postFinished
 	runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+
+	checkTransferForReusePath(config, url, runCheckResultCh)
 	return
 }

@@ -153,6 +153,7 @@ const (
 	SubCheckNameContentTypeForwarding        = "content_type_forwarding"
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
+	SubCheckNameReusePath                    = "reuse_path"
 )
 
 type RunCheckResult struct {
@@ -344,6 +345,56 @@ func checkXRobotsTag(getResp *http.Response, runCheckResultCh chan<- RunCheckRes
 	} else {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
 	}
+}
+
+func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan<- RunCheckResult) {
+	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
+	defer getHttpClient.CloseIdleConnections()
+	postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
+	defer postHttpClient.CloseIdleConnections()
+
+	bodyString := "message for reuse"
+
+	getRespCh := make(chan *http.Response)
+	go func() {
+		getReq, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
+			return
+		}
+		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+		if !getOk {
+			return
+		}
+		getRespCh <- getResp
+	}()
+
+	postFinishedCh := make(chan struct{})
+	go func() {
+		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+		if err != nil {
+			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to create POST request", err)}}
+			return
+		}
+		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, runCheckResultCh)
+		if !postOk {
+			return
+		}
+		postFinishedCh <- struct{}{}
+	}()
+
+	getResp := <-getRespCh
+	bodyBytes, err := io.ReadAll(getResp.Body)
+	if err != nil {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}}
+		return
+	}
+	if string(bodyBytes) != bodyString {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}}
+		return
+	}
+	runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath}
+	<-postFinishedCh
 }
 
 func runCheck(c *Check, config *Config, resultCh chan<- Result) {

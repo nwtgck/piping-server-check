@@ -87,6 +87,8 @@ func get_first() Check {
 			}
 			<-getFinished
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+
+			checkTransferForReusePath(config, url, runCheckResultCh)
 			return
 		},
 	}
