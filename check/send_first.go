@@ -1,6 +1,7 @@
 package check
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/nwtgck/piping-server-check/util"
@@ -46,6 +47,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	url := serverUrl + path
 
 	contentType := "text/plain"
+	gettingCh := make(chan struct{}, 1)
 	// h3 does not support httptrace: https://github.com/quic-go/quic-go/issues/3342
 	var getWroteRequestNotForH3 bool
 	postRespCh := make(chan *http.Response, 1)
@@ -70,7 +72,9 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			if config.Protocol == ProtocolH3 {
 				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Warnings: []ResultWarning{NewWarning("not supported in h3", nil)}}
 			} else {
-				checkSenderConnected(config, sendMethod, url, runCheckResultCh)
+				ctx, cancel := context.WithCancel(context.Background())
+				go func() { <-gettingCh; cancel() }()
+				checkSenderConnected(ctx, config, sendMethod, url, runCheckResultCh)
 			}
 		}
 		postRespCh <- postResp
@@ -81,6 +85,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 
+	gettingCh <- struct{}{}
 	getReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
@@ -113,18 +118,19 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	return
 }
 
-func checkSenderConnected(config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
+func checkSenderConnected(ctx context.Context, config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
 	sendHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer sendHttpClient.CloseIdleConnections()
 	pr, _ := io.Pipe()
 	sendReq, err := http.NewRequest(sendMethod, url, pr)
 	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to create %s request", sendMethod), err))
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to create %s request", sendMethod), err)}}
 		return
 	}
+	sendReq = sendReq.WithContext(ctx)
 	sendResp, err := sendHttpClient.Do(sendReq)
 	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", sendMethod), err))
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}}
 		return
 	}
 	if resultErrors := checkProtocol(sendResp, config.Protocol); len(resultErrors) != 0 {
