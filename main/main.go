@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fatih/color"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nwtgck/piping-server-check/check"
+	"github.com/nwtgck/piping-server-check/main/ui"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"net/url"
@@ -101,39 +102,52 @@ var rootCmd = &cobra.Command{
 		commonConfig.GetResponseReceivedTimeout = 5 * time.Second
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
 
-		shouldExitWithNonZero := false
-		var jsonlBytes []byte
-		// TODO: output version
-		for result := range check.RunChecks(checks, &commonConfig, protocols) {
-			jsonBytes, err := json.Marshal(&result)
-			if err != nil {
-				return err
-			}
-			line := string(jsonBytes)
-			jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
-			if len(result.Errors) != 0 {
-				if slices.Contains(flag.compromiseResultNames, result.Name) {
-					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
-				} else {
-					shouldExitWithNonZero = true
-					line = color.RedString(fmt.Sprintf("✖︎ %s", line))
+		exitCodeCh := make(chan int, 1)
+		progCh := make(chan *tea.Program)
+		errCh := make(chan error)
+		go func() {
+			prog := <-progCh
+			shouldExitWithNonZero := false
+			var jsonlBytes []byte
+			// TODO: output version
+			var results []check.Result
+			for result := range check.RunChecks(checks, &commonConfig, protocols) {
+				results = append(results, result)
+				prog.Send(ui.UpdateResultsMsg{Results: results})
+				jsonBytes, err := json.Marshal(&result)
+				if err != nil {
+					errCh <- err
+					return
 				}
-			} else if len(result.Warnings) != 0 {
-				line = color.YellowString(fmt.Sprintf("⚠︎ %s", line))
+				jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
+				shouldExitWithNonZero = len(result.Errors) != 0 && !slices.Contains(flag.compromiseResultNames, result.Name)
+			}
+			if flag.resultJSONLPath != "" {
+				err := os.WriteFile(flag.resultJSONLPath, jsonlBytes, 0644)
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}
+			prog.Quit()
+			errCh <- nil
+			if shouldExitWithNonZero {
+				exitCodeCh <- 1
 			} else {
-				line = color.GreenString(fmt.Sprintf("✔︎ %s", line))
+				exitCodeCh <- 0
 			}
-			fmt.Println(line)
+		}()
+
+		prog := tea.NewProgram(ui.Model{CompromiseResultNames: flag.compromiseResultNames})
+		progCh <- prog
+		_, err := prog.Run()
+		if err != nil {
+			return err
 		}
-		if flag.resultJSONLPath != "" {
-			err := os.WriteFile(flag.resultJSONLPath, jsonlBytes, 0644)
-			if err != nil {
-				return err
-			}
+		if err := <-errCh; err != nil {
+			return err
 		}
-		if shouldExitWithNonZero {
-			os.Exit(1)
-		}
+		os.Exit(<-exitCodeCh)
 		return nil
 	},
 }
