@@ -1,7 +1,9 @@
 package check
 
 import (
+	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/util"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -64,6 +66,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
 		} else {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
+			checkSenderConnected(config, sendMethod, url, runCheckResultCh)
 		}
 		postRespCh <- postResp
 	}()
@@ -103,4 +106,32 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 
 	checkTransferForReusePath(config, url, runCheckResultCh)
 	return
+}
+
+func checkSenderConnected(config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
+	// TODO:
+	if config.Protocol == ProtocolH3 {
+		return
+	}
+	sendHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
+	defer sendHttpClient.CloseIdleConnections()
+	pr, _ := io.Pipe()
+	sendReq, err := http.NewRequest(sendMethod, url, pr)
+	if err != nil {
+		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to create %s request", sendMethod), err))
+		return
+	}
+	sendResp, err := sendHttpClient.Do(sendReq)
+	if err != nil {
+		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", sendMethod), err))
+		return
+	}
+	if resultErrors := checkProtocol(sendResp, config.Protocol); len(resultErrors) != 0 {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+	}
+	if util.IsHttp4xxError(sendResp) {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection}
+	} else {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("expected 4xx status but found: %d", sendResp.StatusCode), nil)}}
+	}
 }

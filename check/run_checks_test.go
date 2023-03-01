@@ -92,6 +92,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 	*truePointer = true
 	expected := []Result{
 		{Name: "post_first.sender_response_before_receiver", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first.same_path_sender_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first.x_robots_tag_none", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
@@ -101,6 +102,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "get_first.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "get_first.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.sender_response_before_receiver", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "put.same_path_sender_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.x_robots_tag_none", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},

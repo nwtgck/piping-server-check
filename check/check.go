@@ -150,6 +150,7 @@ type Result struct {
 const (
 	SubCheckNameProtocol                     = "protocol"
 	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
+	SubCheckNameSamePathSenderRejection      = "same_path_sender_rejection"
 	SubCheckNameContentTypeForwarding        = "content_type_forwarding"
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
