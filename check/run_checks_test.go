@@ -178,5 +178,7 @@ func TestRunChecksForH3(t *testing.T) {
 	})
 	assert.ElementsMatch(t, warningResultNames, []string{
 		"get_first",
+		"post_first.same_path_sender_rejection",
+		"put.same_path_sender_rejection",
 	})
 }

@@ -46,7 +46,8 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	url := serverUrl + path
 
 	contentType := "text/plain"
-	var getWroteRequest bool
+	// h3 does not support httptrace: https://github.com/quic-go/quic-go/issues/3342
+	var getWroteRequestNotForH3 bool
 	postRespCh := make(chan *http.Response, 1)
 	postFinished := make(chan struct{})
 	go func() {
@@ -62,11 +63,15 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			return
 		}
 		// TODO: not subcheck in HTTP/1.0
-		if getWroteRequest {
+		if getWroteRequestNotForH3 {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
 		} else {
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
-			checkSenderConnected(config, sendMethod, url, runCheckResultCh)
+			if config.Protocol == ProtocolH3 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Warnings: []ResultWarning{NewWarning("not supported in h3", nil)}}
+			} else {
+				checkSenderConnected(config, sendMethod, url, runCheckResultCh)
+			}
 		}
 		postRespCh <- postResp
 	}()
@@ -83,7 +88,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	}
 	getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
-			getWroteRequest = true
+			getWroteRequestNotForH3 = true
 		},
 	}))
 	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
@@ -109,10 +114,6 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 }
 
 func checkSenderConnected(config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
-	// TODO:
-	if config.Protocol == ProtocolH3 {
-		return
-	}
 	sendHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer sendHttpClient.CloseIdleConnections()
 	pr, _ := io.Pipe()
