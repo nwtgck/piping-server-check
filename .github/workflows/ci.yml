@@ -31,7 +31,7 @@ jobs:
       - name: Operational test
         run: |
           set -eu
-          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --result-jsonl-path=/tmp/result1.jsonl
+          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --transfer-span 1s --transfer-span 2s --transfer-span 3s --result-jsonl-path=/tmp/result1.jsonl
           cat /tmp/result1.jsonl
       - name: Operational test (error case)
         run: |

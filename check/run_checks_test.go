@@ -82,10 +82,13 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
+		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
 	for result := range RunChecks(checks, &config, protocols) {
+		// Remove messages because some of them are not predictable
+		result.Message = ""
 		results = append(results, result)
 	}
 	truePointer := new(bool)
@@ -109,6 +112,10 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_chunked_long_transfer.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }
