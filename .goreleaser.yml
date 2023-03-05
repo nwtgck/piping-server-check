@@ -6,16 +6,18 @@ builds:
       - linux
       - windows
       - darwin
-      - freebsd
+      # TODO: Uncomment out when the development stabilized.
+      # - freebsd
     goarch:
       - amd64
       - arm
       - arm64
-      - 386
-      - ppc64le
-      - s390x
-      - mips64
-      - mips64le
+      # TODO: Uncomment out when the development stabilized.
+      # - 386
+      # - ppc64le
+      # - s390x
+      # - mips64
+      # - mips64le
     goarm:
       - 6
       - 7
