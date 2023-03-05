@@ -115,6 +115,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_first_chunked_long_transfer.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }

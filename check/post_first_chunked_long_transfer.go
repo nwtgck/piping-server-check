@@ -39,7 +39,8 @@ func post_first_chunked_long_transfer() Check {
 			path := "/" + uuid.NewString()
 			url := serverUrl + path
 			var randomSeed int64 = 11
-			sendingReader := util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), 1024*1024 /* 1MB */)
+			finishSendReaderCh := make(chan struct{}, 1)
+			sendingReader := util.NewFinishableReader(util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), 1024*1024 /* 1MB */), finishSendReaderCh)
 			expectedReader := rand.New(rand.NewSource(randomSeed))
 
 			postRespArrived := make(chan struct{}, 1)
@@ -91,9 +92,13 @@ func post_first_chunked_long_transfer() Check {
 			totalReadByte := 0
 			var buff [1 << 15]byte
 			var expectedBuff [1 << 15]byte
-			for i := 0; i < len(config.SortedTransferSpans); {
+			readerFinishSent := false
+			for i := 0; ; {
 				transferSpan := config.SortedTransferSpans[i]
 				n, err := getResp.Body.Read(buff[:])
+				if err == io.EOF {
+					break
+				}
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
 					return
@@ -108,10 +113,20 @@ func post_first_chunked_long_transfer() Check {
 					return
 				}
 				if time.Since(startTime) >= transferSpan {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNamePartialTransfer, Message: fmt.Sprintf("%v: %s transferred", transferSpan, util.HumanizeBytes(float64(totalReadByte)))}
-					i++
+					if !readerFinishSent {
+						runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNamePartialTransfer, Message: fmt.Sprintf("%v: %s transferred", transferSpan, util.HumanizeBytes(float64(totalReadByte)))}
+					}
+					if i == len(config.SortedTransferSpans)-1 && !readerFinishSent {
+						finishSendReaderCh <- struct{}{}
+						readerFinishSent = true
+					}
+					if i != len(config.SortedTransferSpans)-1 {
+						i++
+					}
 				}
 			}
+			<-postFinished
+			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
 	}
