@@ -17,7 +17,7 @@ func post_first_chunked_long_transfer() Check {
 		Name: getCheckName(),
 		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
 			defer close(runCheckResultCh)
-			if len(config.TransferSpans) == 0 {
+			if len(config.SortedTransferSpans) == 0 {
 				// skipped
 				return
 			}
@@ -91,8 +91,8 @@ func post_first_chunked_long_transfer() Check {
 			totalReadByte := 0
 			var buff [1 << 15]byte
 			var expectedBuff [1 << 15]byte
-			for i := 0; i < len(config.TransferSpans); {
-				transferSpan := config.TransferSpans[i]
+			for i := 0; i < len(config.SortedTransferSpans); {
+				transferSpan := config.SortedTransferSpans[i]
 				n, err := getResp.Body.Read(buff[:])
 				if err != nil {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
@@ -112,8 +112,6 @@ func post_first_chunked_long_transfer() Check {
 					i++
 				}
 			}
-			<-postFinished
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
 		},
 	}

@@ -25,6 +25,7 @@ var flag struct {
 	h2c                   bool
 	h3                    bool
 	compromiseResultNames []string
+	transferSpans         []time.Duration
 	concurrency           uint
 	resultJSONLPath       string
 }
@@ -42,6 +43,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.h2c, "h2c", "", false, "HTTP/2 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.h3, "h3", "", false, "HTTP/3")
 	rootCmd.PersistentFlags().StringArrayVarP(&flag.compromiseResultNames, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise put.transferred)")
+	rootCmd.PersistentFlags().DurationSliceVarP(&flag.transferSpans, "transfer-span", "", nil, "transfer spans used in long transfer checks (e.g. 3s)")
 	rootCmd.PersistentFlags().UintVarP(&flag.concurrency, "concurrency", "", 1, "1 means running check one by one. 2 means that two checks run concurrently")
 	rootCmd.PersistentFlags().StringVarP(&flag.resultJSONLPath, "result-jsonl-path", "", "", "output file path of result JSONL")
 }
@@ -100,14 +102,8 @@ var rootCmd = &cobra.Command{
 		// TODO: to be option
 		commonConfig.GetResponseReceivedTimeout = 5 * time.Second
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
-		// TODO: hard code
-		commonConfig.TransferSpans = []time.Duration{
-			3 * time.Second,
-			10 * time.Second,
-			30 * time.Second,
-			1 * time.Minute,
-			3 * time.Minute,
-		}
+		slices.Sort(flag.transferSpans)
+		commonConfig.SortedTransferSpans = flag.transferSpans
 
 		shouldExitWithNonZero := false
 		var jsonlBytes []byte

@@ -82,7 +82,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
-		TransferSpans:                       []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
+		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
@@ -115,7 +115,6 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
-		{Name: "post_first_chunked_long_transfer.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }
