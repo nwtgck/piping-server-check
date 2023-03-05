@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"io"
 	"time"
 )
@@ -11,6 +12,9 @@ type RateLimitReader struct {
 }
 
 func NewRateLimitReader(r io.Reader, bytePerSec int) io.Reader {
+	if bytePerSec == 0 {
+		panic(fmt.Errorf("bytePerSec is 0"))
+	}
 	return &RateLimitReader{inner: r, bytePerSec: bytePerSec}
 }
 

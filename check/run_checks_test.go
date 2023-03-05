@@ -82,6 +82,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
+		TransferBytePerSec:                  1024 * 1024 * 1024 * 1024,
 		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
 	}
 	protocols := []Protocol{ProtocolHttp1_1}

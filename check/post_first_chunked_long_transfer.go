@@ -40,7 +40,7 @@ func post_first_chunked_long_transfer() Check {
 			url := serverUrl + path
 			var randomSeed int64 = 11
 			finishSendReaderCh := make(chan struct{}, 1)
-			sendingReader := util.NewFinishableReader(util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), 1024*1024 /* 1MB */), finishSendReaderCh)
+			sendingReader := util.NewFinishableReader(util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), config.TransferBytePerSec), finishSendReaderCh)
 			expectedReader := rand.New(rand.NewSource(randomSeed))
 
 			postRespArrived := make(chan struct{}, 1)
