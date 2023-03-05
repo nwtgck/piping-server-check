@@ -65,6 +65,11 @@ var rootCmd = &cobra.Command{
 	Use:   os.Args[0],
 	Short: "Check Piping Server",
 	RunE: func(_ *cobra.Command, args []string) error {
+		// https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+		// https://github.com/fatih/color/blob/d080a5b7925fbc23275fea62c8f5d82991bfead4/README.md?plain=1#L160
+		if os.Getenv("GITHUB_ACTIONS") == "true" {
+			color.NoColor = false
+		}
 		var commonConfig check.Config
 		if flag.ServerCommand != "" {
 			// TODO: sh -c
