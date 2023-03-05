@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -214,7 +215,12 @@ func waitTCPServer(address string) {
 	}
 }
 
+// To avoid port already used error
+var prepareServerMutex = new(sync.Mutex)
+
 func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
+	prepareServerMutex.Lock()
+	defer prepareServerMutex.Unlock()
 	httpPort, err := util.GetTCPPort()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
