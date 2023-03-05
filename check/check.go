@@ -41,6 +41,7 @@ type Config struct {
 	FirstByteCheckTimeout               time.Duration
 	GetResponseReceivedTimeout          time.Duration
 	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+	TransferSpans                       []time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -141,6 +142,7 @@ type Result struct {
 	// result name can be "<check name>.<subcheck name>" or "<check name>"
 	Name      string          `json:"name"`
 	Protocol  Protocol        `json:"protocol"`
+	Message   string          `json:"message,omitempty"`
 	OkForJson *bool           `json:"ok,omitempty"`
 	Errors    []ResultError   `json:"errors,omitempty"`
 	Warnings  []ResultWarning `json:"warnings,omitempty"`
@@ -155,11 +157,13 @@ const (
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
 	SubCheckNameReusePath                    = "reuse_path"
+	SubCheckNamePartialTransfer              = "partial_transfer"
 )
 
 type RunCheckResult struct {
 	// empty string is ok
 	SubCheckName string
+	Message      string
 	Errors       []ResultError
 	Warnings     []ResultWarning
 }
@@ -410,6 +414,7 @@ func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 		} else {
 			result.Name = c.Name + "." + runCheckResult.SubCheckName
 		}
+		result.Message = runCheckResult.Message
 		result.Errors = runCheckResult.Errors
 		result.Warnings = runCheckResult.Warnings
 		result.Protocol = config.Protocol

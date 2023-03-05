@@ -100,6 +100,14 @@ var rootCmd = &cobra.Command{
 		// TODO: to be option
 		commonConfig.GetResponseReceivedTimeout = 5 * time.Second
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
+		// TODO: hard code
+		commonConfig.TransferSpans = []time.Duration{
+			3 * time.Second,
+			10 * time.Second,
+			30 * time.Second,
+			1 * time.Minute,
+			3 * time.Minute,
+		}
 
 		shouldExitWithNonZero := false
 		var jsonlBytes []byte
