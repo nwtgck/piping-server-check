@@ -156,6 +156,7 @@ const (
 	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
 	SubCheckNameSamePathSenderRejection      = "same_path_sender_rejection"
 	SubCheckNameContentTypeForwarding        = "content_type_forwarding"
+	SubCheckNameContentDispositionForwarding = "content_disposition_forwarding"
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
 	SubCheckNameReusePath                    = "reuse_path"
@@ -299,6 +300,13 @@ func prepareServerUrl(config *Config, runCheckResultCh chan<- RunCheckResult) (s
 	return serverUrl, true, func() {}
 }
 
+// Use this function when Go standard HTTP library automatically attach it.
+func ensureContentLengthExits(req *http.Request) {
+	if req.ContentLength <= 0 {
+		panic(fmt.Errorf("Content-Length not found in %v", req))
+	}
+}
+
 func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	var resultErrors []ResultError
 	var versionOk bool
@@ -347,6 +355,15 @@ func checkContentTypeForwarding(getResp *http.Response, expectedContentType stri
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
 	} else {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}}
+	}
+}
+
+func checkContentDispositionForwarding(getResp *http.Response, expectedContentDisposition string, runCheckResultCh chan<- RunCheckResult) {
+	receivedContentDisposition := getResp.Header.Get("Content-Disposition")
+	if receivedContentDisposition == expectedContentDisposition {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding}
+	} else {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}}
 	}
 }
 

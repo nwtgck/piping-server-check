@@ -8,5 +8,6 @@ func AllChecks() []Check {
 		service_worker_registration_rejection(),
 		post_first_byte_by_byte_streaming(),
 		post_first_chunked_long_transfer(),
+		multipart_form_data(),
 	}
 }

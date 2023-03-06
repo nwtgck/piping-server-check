@@ -59,6 +59,7 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
 			return
 		}
+		ensureContentLengthExits(postReq)
 		postReq.Header.Set("Content-Type", contentType)
 		postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
 		if !postOk {
