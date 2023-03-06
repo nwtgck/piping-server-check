@@ -34,6 +34,7 @@ const (
 
 type Config struct {
 	RunServerCmd                        []string
+	HealthCheckPath                     string
 	ServerSchemalessUrl                 string
 	Protocol                            Protocol
 	TlsSkipVerifyCert                   bool
@@ -205,11 +206,11 @@ func startServer(cmd []string, httpPort string, httpsPort string) (c *exec.Cmd, 
 	return
 }
 
-func waitTCPServer(address string) {
+func waitHTTPServer(httpClient *http.Client, healthCheckUrl string) {
 	time.Sleep(100 * time.Millisecond)
 	for {
-		_, err := net.Dial("tcp", address)
-		if err == nil {
+		resp, err := httpClient.Get(healthCheckUrl)
+		if err == nil && (200 <= resp.StatusCode && resp.StatusCode < 300) {
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -272,8 +273,9 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 	}
 
 	go func() {
-		waitTCPServer(httpAddress)
-		// TODO: wait UDP server for HTTP/3
+		client := newHTTPClient(config.Protocol, true /* always skip verification for health check */)
+		defer client.CloseIdleConnections()
+		waitHTTPServer(client, serverUrl+config.HealthCheckPath)
 		finishCh <- struct{}{}
 	}()
 

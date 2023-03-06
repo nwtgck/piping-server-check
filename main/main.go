@@ -17,6 +17,7 @@ import (
 
 var flag struct {
 	ServerCommand          string          `json:"server_command,omitempty"`
+	HealthCheckPath        string          `json:"health_check_path"`
 	ServerSchemalessUrl    string          `json:"server_schemaless_url,omitempty"`
 	TlsSkipVerify          bool            `json:"tls_skip_verify"`
 	Http1_0                bool            `json:"http1.0"`
@@ -45,6 +46,7 @@ func (d *jsonDuration) MarshalJSON() ([]byte, error) {
 func init() {
 	cobra.OnInitialize()
 	rootCmd.PersistentFlags().StringVarP(&flag.ServerCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT in command")
+	rootCmd.PersistentFlags().StringVarP(&flag.HealthCheckPath, "health-check-path", "", "/", "Health check path for server command. (e.g. /, /version)")
 	rootCmd.PersistentFlags().StringVarP(&flag.ServerSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.TlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.Http1_0, "http1.0", "", false, "HTTP/1.0 cleartext")
@@ -85,6 +87,7 @@ var rootCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Specify --server-command or --server-schemaless-url\n")
 			os.Exit(1)
 		}
+		commonConfig.HealthCheckPath = flag.HealthCheckPath
 		checks := check.AllChecks()
 		var protocols []check.Protocol
 		if flag.Http1_0 {
