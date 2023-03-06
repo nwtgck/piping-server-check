@@ -156,6 +156,7 @@ const (
 	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
 	SubCheckNameSamePathSenderRejection      = "same_path_sender_rejection"
 	SubCheckNameContentTypeForwarding        = "content_type_forwarding"
+	SubCheckNameContentDispositionForwarding = "content_disposition_forwarding"
 	SubCheckNameXRobotsTagNone               = "x_robots_tag_none"
 	SubCheckNameTransferred                  = "transferred"
 	SubCheckNameReusePath                    = "reuse_path"
@@ -347,6 +348,15 @@ func checkContentTypeForwarding(getResp *http.Response, expectedContentType stri
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
 	} else {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}}
+	}
+}
+
+func checkContentDispositionForwarding(getResp *http.Response, expectedContentDisposition string, runCheckResultCh chan<- RunCheckResult) {
+	receivedContentType := getResp.Header.Get("Content-Disposition")
+	if receivedContentType == expectedContentDisposition {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding}
+	} else {
+		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentType)}}
 	}
 }
 

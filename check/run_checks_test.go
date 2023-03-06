@@ -65,7 +65,10 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		}
 		assert.Contains(t, []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}, result.Protocol)
 	}
-	assert.ElementsMatch(t, []string{}, errorResultNames)
+	assert.ElementsMatch(t, []string{
+		"multipart_form_data",
+		"multipart_form_data",
+	}, errorResultNames)
 	assert.Equal(t, []string{
 		"post_first.sender_response_before_receiver",
 		"post_first.sender_response_before_receiver",
@@ -117,6 +120,9 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.content_disposition_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }
