@@ -26,7 +26,7 @@ var flag struct {
 	H2                     bool            `json:"h2"`
 	H2c                    bool            `json:"h2c"`
 	H3                     bool            `json:"h3"`
-	CompromiseResultNames  []string        `json:"compromise,omitempty"`
+	Compromises            []string        `json:"compromise,omitempty"`
 	LongTransferBytePerSec int             `json:"long_transfer_speed_byte,omitempty"`
 	TransferSpans          []time.Duration `json:"-"`
 	TransferSpansForJson   []jsonDuration  `json:"transfer_spans,omitempty"`
@@ -54,7 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flag.H2, "h2", "", false, "HTTP/2 (TLS)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.H2c, "h2c", "", false, "HTTP/2 cleartext")
 	rootCmd.PersistentFlags().BoolVarP(&flag.H3, "h3", "", false, "HTTP/3")
-	rootCmd.PersistentFlags().StringArrayVarP(&flag.CompromiseResultNames, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise put.transferred)")
+	rootCmd.PersistentFlags().StringArrayVarP(&flag.Compromises, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise http1.1/put.transferred)")
 	rootCmd.PersistentFlags().IntVarP(&flag.LongTransferBytePerSec, "transfer-speed-byte", "", 1024*1024, "transfer byte-per-second used in long transfer checks")
 	rootCmd.PersistentFlags().DurationSliceVarP(&flag.TransferSpans, "transfer-span", "", nil, "transfer spans used in long transfer checks (e.g. 3s)")
 	rootCmd.PersistentFlags().UintVarP(&flag.Concurrency, "concurrency", "", 1, "1 means running check one by one. 2 means that two checks run concurrently")
@@ -157,7 +157,7 @@ var rootCmd = &cobra.Command{
 			line := string(jsonBytes)
 			jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
 			if len(result.Errors) != 0 {
-				if slices.Contains(flag.CompromiseResultNames, result.Name) {
+				if shouldCompromise(&result) {
 					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
 				} else {
 					shouldExitWithNonZero = true
@@ -181,6 +181,19 @@ var rootCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func shouldCompromise(result *check.Result) bool {
+	for _, compromise := range flag.Compromises {
+		splits := strings.SplitN(compromise, "/", 2)
+		if len(splits) == 1 && splits[0] == result.Name {
+			return true
+		}
+		if len(splits) == 2 && check.Protocol(splits[0]) == result.Protocol && splits[1] == result.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
