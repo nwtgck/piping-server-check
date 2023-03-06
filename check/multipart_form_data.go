@@ -68,8 +68,8 @@ func multipart_form_data() Check {
 					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
 					return
 				}
+				ensureContentLengthExits(postReq)
 				postReq.Header.Set("Content-Type", contentType)
-				// TODO: ensure content-length
 				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
 				if !postOk {
 					return

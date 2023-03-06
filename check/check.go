@@ -300,6 +300,13 @@ func prepareServerUrl(config *Config, runCheckResultCh chan<- RunCheckResult) (s
 	return serverUrl, true, func() {}
 }
 
+// Use this function when Go standard HTTP library automatically attach it.
+func ensureContentLengthExits(req *http.Request) {
+	if req.ContentLength <= 0 {
+		panic(fmt.Errorf("Content-Length not found in %v", req))
+	}
+}
+
 func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	var resultErrors []ResultError
 	var versionOk bool
