@@ -116,13 +116,13 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.content_disposition_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "multipart_form_data.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
-		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
-		{Name: "multipart_form_data.content_disposition_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
-		{Name: "multipart_form_data.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 	}
 	assert.Equal(t, expected, results)
 }
