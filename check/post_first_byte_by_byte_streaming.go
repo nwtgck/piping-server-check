@@ -119,6 +119,19 @@ func post_first_byte_by_byte_streaming() Check {
 					return
 				}
 			}
+			if err := pw.Close(); err != nil {
+				runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("failed to close sending body", err)}}
+				return
+			}
+			n, err := getResp.Body.Read(buff[:])
+			if n != 0 {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("expected to read 0 bytes but %d", n), err)}}
+				return
+			}
+			if err != io.EOF {
+				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("expected to get EOF", err)}}
+				return
+			}
 			<-postFinished
 			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
 			return
