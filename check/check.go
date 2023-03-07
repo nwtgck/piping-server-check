@@ -472,7 +472,7 @@ func RunChecks(checks []Check, commonConfig *Config, protocols []Protocol) <-cha
 		for _, c := range checks {
 			for _, protocol := range protocols {
 				var resultChForRunCheck chan Result
-				resultChForRunCheck = make(chan Result)
+				resultChForRunCheck = make(chan Result, 128 /* subcheck waits if buffer size is less than the number of subchecks */)
 				resultChForRunCheckCh <- resultChForRunCheck
 				config := *commonConfig
 				config.Protocol = protocol
