@@ -74,6 +74,8 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		"post_first.sender_response_before_receiver",
 		"put.sender_response_before_receiver",
 		"put.sender_response_before_receiver",
+		"post_cancel_post",
+		"post_cancel_post",
 	}, warningResultNames)
 }
 
@@ -114,6 +116,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.x_robots_tag_none", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "post_cancel_post", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
@@ -149,7 +152,9 @@ func TestRunChecksForH2C(t *testing.T) {
 		}
 		assert.Equal(t, ProtocolH2c, result.Protocol)
 	}
-	assert.ElementsMatch(t, errorResultNames, []string{})
+	assert.ElementsMatch(t, errorResultNames, []string{
+		"post_cancel_post",
+	})
 	assert.ElementsMatch(t, warningResultNames, []string{})
 }
 
@@ -182,7 +187,9 @@ func TestRunChecksForH3(t *testing.T) {
 		}
 		assert.Equal(t, ProtocolH3, result.Protocol)
 	}
-	assert.ElementsMatch(t, errorResultNames, []string{})
+	assert.ElementsMatch(t, errorResultNames, []string{
+		"post_cancel_post",
+	})
 	assert.ElementsMatch(t, warningResultNames, []string{
 		"get_first",
 		"post_first.same_path_sender_rejection",
