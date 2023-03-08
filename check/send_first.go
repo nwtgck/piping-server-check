@@ -123,8 +123,14 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 func checkSenderConnected(ctx context.Context, config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
 	sendHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer sendHttpClient.CloseIdleConnections()
-	pr, _ := io.Pipe()
-	sendReq, err := http.NewRequest(sendMethod, url, pr)
+	var bodyReader io.Reader
+	if config.Protocol == ProtocolHttp1_0 || config.Protocol == ProtocolHttp1_0_tls {
+		// HTTP/1.0 does not support chunked encoding
+		bodyReader = strings.NewReader("my message")
+	} else {
+		bodyReader, _ = io.Pipe()
+	}
+	sendReq, err := http.NewRequest(sendMethod, url, bodyReader)
 	if err != nil {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to create %s request", sendMethod), err)}}
 		return
@@ -134,9 +140,6 @@ func checkSenderConnected(ctx context.Context, config *Config, sendMethod string
 	if err != nil {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}}
 		return
-	}
-	if resultErrors := checkProtocol(sendResp, config.Protocol); len(resultErrors) != 0 {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
 	}
 	if util.IsHttp4xxError(sendResp) {
 		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection}
