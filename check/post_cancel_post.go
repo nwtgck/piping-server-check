@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func post_cancel_post() Check {
@@ -49,6 +50,7 @@ func post_cancel_post() Check {
 					return
 				}
 				cancel()
+				time.Sleep(5 * time.Second)
 			}
 
 			{
