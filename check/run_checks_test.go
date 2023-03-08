@@ -50,6 +50,7 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
+		WaitDurationAfterCancel:             1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
 	var errorResultNames []string
@@ -89,6 +90,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		GetResponseReceivedTimeout:          1 * time.Second,
 		TransferBytePerSec:                  1024 * 1024 * 1024 * 1024,
 		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
+		WaitDurationAfterCancel:             1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
@@ -139,6 +141,7 @@ func TestRunChecksForH2C(t *testing.T) {
 		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
 		FirstByteCheckTimeout:               100 * time.Millisecond,
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
+		WaitDurationAfterCancel:             1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH2c}
 	var errorResultNames []string
@@ -174,6 +177,7 @@ func TestRunChecksForH3(t *testing.T) {
 		FirstByteCheckTimeout:               100 * time.Millisecond,
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
 		GetReqWroteRequestWaitForH3:         0,
+		WaitDurationAfterCancel:             1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH3}
 	var errorResultNames []string

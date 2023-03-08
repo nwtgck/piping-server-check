@@ -50,8 +50,10 @@ func post_cancel_post() Check {
 					return
 				}
 				cancel()
-				time.Sleep(5 * time.Second)
 			}
+
+			// Without this, it works in local but not work in GitHub Actions
+			time.Sleep(config.WaitDurationAfterCancel)
 
 			{
 				postReq2, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
