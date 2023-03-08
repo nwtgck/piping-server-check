@@ -9,7 +9,7 @@ import (
 )
 
 var pipingServerPkg1_12_8Path string
-var goPipingServer0_4_0Path string
+var goPipingServer0_5_0Path string
 
 func init() {
 	var err error
@@ -17,7 +17,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	goPipingServer0_4_0Path, err = downloadGoPipingServerIfNotCached("0.4.0")
+	goPipingServer0_5_0Path, err = downloadGoPipingServerIfNotCached("0.5.0")
 	if err != nil {
 		panic(err)
 	}
@@ -130,7 +130,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 func TestRunChecksForH2C(t *testing.T) {
 	checks := AllChecks()
 	config := Config{
-		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", goPipingServer0_4_0Path)},
+		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", goPipingServer0_5_0Path)},
 		Concurrency:  10,
 		// Short timeouts are OK because the checks are always timeout when they are long
 		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
@@ -149,13 +149,8 @@ func TestRunChecksForH2C(t *testing.T) {
 		}
 		assert.Equal(t, ProtocolH2c, result.Protocol)
 	}
-	assert.ElementsMatch(t, errorResultNames, []string{
-		"post_first_byte_by_byte_streaming",
-	})
-	assert.ElementsMatch(t, warningResultNames, []string{
-		"post_first.sender_response_before_receiver",
-		"put.sender_response_before_receiver",
-	})
+	assert.ElementsMatch(t, errorResultNames, []string{})
+	assert.ElementsMatch(t, warningResultNames, []string{})
 }
 
 func TestRunChecksForH3(t *testing.T) {
@@ -166,7 +161,7 @@ func TestRunChecksForH3(t *testing.T) {
 	defer removeKeyAndCert()
 	checks := AllChecks()
 	config := Config{
-		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_4_0Path, keyPath, certPath)},
+		RunServerCmd:      []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s --enable-http3", goPipingServer0_5_0Path, keyPath, certPath)},
 		TlsSkipVerifyCert: true,
 		Concurrency:       10,
 		// Short timeouts are OK because the checks are always timeout when they are long
@@ -187,9 +182,7 @@ func TestRunChecksForH3(t *testing.T) {
 		}
 		assert.Equal(t, ProtocolH3, result.Protocol)
 	}
-	assert.ElementsMatch(t, errorResultNames, []string{
-		"post_first_byte_by_byte_streaming",
-	})
+	assert.ElementsMatch(t, errorResultNames, []string{})
 	assert.ElementsMatch(t, warningResultNames, []string{
 		"get_first",
 		"post_first.same_path_sender_rejection",
