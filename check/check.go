@@ -45,7 +45,7 @@ type Config struct {
 	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
 	TransferBytePerSec                  int
 	SortedTransferSpans                 []time.Duration
-	WaitDurationAfterCancel             time.Duration
+	WaitDurationAfterSenderCancel       time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
