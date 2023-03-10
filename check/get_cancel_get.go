@@ -107,6 +107,7 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 	}()
 
 	postFinishedCh := make(chan struct{})
+	postFailedCh := make(chan struct{})
 	go func() {
 		if config.Protocol == ProtocolH3 {
 			// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
@@ -118,10 +119,12 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}})
+			postFailedCh <- struct{}{}
 			return
 		}
 		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
+			postFailedCh <- struct{}{}
 			return
 		}
 		postFinishedCh <- struct{}{}
@@ -131,6 +134,8 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 	select {
 	case getResp = <-getRespCh:
 	case <-getFailedCh:
+		return
+	case <-postFailedCh:
 		return
 	}
 
