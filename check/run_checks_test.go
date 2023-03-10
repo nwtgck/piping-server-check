@@ -51,6 +51,7 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		FirstByteCheckTimeout:               1 * time.Second,
 		GetResponseReceivedTimeout:          1 * time.Second,
 		WaitDurationAfterSenderCancel:       1 * time.Second,
+		WaitDurationAfterReceiverCancel:     1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
 	var errorResultNames []string
@@ -91,6 +92,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		TransferBytePerSec:                  1024 * 1024 * 1024 * 1024,
 		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
 		WaitDurationAfterSenderCancel:       1 * time.Second,
+		WaitDurationAfterReceiverCancel:     1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
@@ -119,6 +121,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_cancel_post", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "get_cancel_get", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
@@ -142,6 +145,7 @@ func TestRunChecksForH2C(t *testing.T) {
 		FirstByteCheckTimeout:               100 * time.Millisecond,
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
 		WaitDurationAfterSenderCancel:       1 * time.Second,
+		WaitDurationAfterReceiverCancel:     1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH2c}
 	var errorResultNames []string
@@ -157,6 +161,7 @@ func TestRunChecksForH2C(t *testing.T) {
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_cancel_post",
+		"get_cancel_get",
 	})
 	assert.ElementsMatch(t, warningResultNames, []string{})
 }
@@ -178,6 +183,7 @@ func TestRunChecksForH3(t *testing.T) {
 		GetResponseReceivedTimeout:          100 * time.Millisecond,
 		GetReqWroteRequestWaitForH3:         0,
 		WaitDurationAfterSenderCancel:       1 * time.Second,
+		WaitDurationAfterReceiverCancel:     1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH3}
 	var errorResultNames []string
@@ -198,5 +204,6 @@ func TestRunChecksForH3(t *testing.T) {
 		"get_first",
 		"post_first.same_path_sender_rejection",
 		"put.same_path_sender_rejection",
+		"get_cancel_get",
 	})
 }

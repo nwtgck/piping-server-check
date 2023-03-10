@@ -46,6 +46,7 @@ type Config struct {
 	TransferBytePerSec                  int
 	SortedTransferSpans                 []time.Duration
 	WaitDurationAfterSenderCancel       time.Duration
+	WaitDurationAfterReceiverCancel     time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
