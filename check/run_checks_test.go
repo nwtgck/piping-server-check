@@ -204,13 +204,11 @@ func TestRunChecksForH3(t *testing.T) {
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_cancel_post",
 		"get_cancel_get",
-		"get_cancel_get",
 	})
 	assert.ElementsMatch(t, warningResultNames, []string{
 		"get_first",
 		"post_first.same_path_sender_rejection",
 		"put.same_path_sender_rejection",
-		"get_cancel_get",
 		"get_cancel_get",
 	})
 }
