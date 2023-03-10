@@ -15,9 +15,9 @@ import (
 func multipart_form_data() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			defer close(runCheckResultCh)
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			defer reporter.Close()
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 			if !ok {
 				return
 			}
@@ -47,15 +47,15 @@ func multipart_form_data() Check {
 			contentType := multipartWriter.FormDataContentType()
 			part, err := multipartWriter.CreatePart(multipartHeader)
 			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create part", err)))
 				return
 			}
 			if _, err = io.Copy(part, bytes.NewReader(contentBytes)); err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to write content to part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to write content to part", err)))
 				return
 			}
 			if err = multipartWriter.Close(); err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to close part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close part", err)))
 				return
 			}
 
@@ -65,12 +65,12 @@ func multipart_form_data() Check {
 				defer func() { postFinished <- struct{}{} }()
 				postReq, err := http.NewRequest("POST", url, bodyBuffer)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
 				ensureContentLengthExits(postReq)
 				postReq.Header.Set("Content-Type", contentType)
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
@@ -88,10 +88,10 @@ func multipart_form_data() Check {
 				defer func() { getFinished <- struct{}{} }()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 				if !getOk {
 					return
 				}
@@ -102,24 +102,24 @@ func multipart_form_data() Check {
 			select {
 			case getResp = <-getRespCh:
 			case <-time.After(config.GetResponseReceivedTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
+				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
 			}
 
-			checkContentTypeForwarding(getResp, multipartHeaderContentType, runCheckResultCh)
-			checkContentDispositionForwarding(getResp, multipartHeaderDisposition, runCheckResultCh)
+			checkContentTypeForwarding(getResp, multipartHeaderContentType, reporter)
+			checkContentDispositionForwarding(getResp, multipartHeaderDisposition, reporter)
 
 			getBodyBytes, err := io.ReadAll(getResp.Body)
 			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET body", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET body", err)))
 				return
 			}
 			if !bytes.Equal(getBodyBytes, contentBytes) {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}}
+				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}})
 				return
 			}
 			<-postFinished
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
 	}

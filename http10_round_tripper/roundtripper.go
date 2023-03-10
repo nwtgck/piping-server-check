@@ -2,6 +2,7 @@ package http10_round_tripper
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -20,7 +21,8 @@ func (rt Http10RoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	var err error
 	var tlsConnectionState *tls.ConnectionState
 	if req.URL.Scheme == "https" {
-		conn, err = tls.Dial("tcp", req.URL.Hostname()+":"+req.URL.Port(), rt.TLSClientConfig)
+		d := tls.Dialer{Config: rt.TLSClientConfig}
+		conn, err = d.DialContext(req.Context(), "tcp", req.URL.Hostname()+":"+req.URL.Port())
 		// TODO: implement
 		tlsConnectionState = &tls.ConnectionState{
 			HandshakeComplete: true,
@@ -28,7 +30,8 @@ func (rt Http10RoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 		}
 		req.TLS = tlsConnectionState
 	} else {
-		conn, err = net.Dial("tcp", req.URL.Hostname()+":"+req.URL.Port())
+		var d net.Dialer
+		conn, err = d.DialContext(req.Context(), "tcp", req.URL.Hostname()+":"+req.URL.Port())
 	}
 	if err != nil {
 		return nil, err
@@ -71,7 +74,16 @@ func (rt Http10RoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 		})
 	}
 
+	go func() {
+		<-req.Context().Done()
+		conn.Close()
+	}()
 	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	select {
+	case <-req.Context().Done():
+		return nil, context.Canceled
+	default:
+	}
 	if err != nil {
 		return nil, err
 	}

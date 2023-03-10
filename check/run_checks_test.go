@@ -44,13 +44,15 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 	defer removeKeyAndCert()
 	checks := AllChecks()
 	config := Config{
-		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s", pipingServerPkg1_12_8Path, keyPath, certPath)},
-		Concurrency:                         10,
-		TlsSkipVerifyCert:                   true,
-		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
-		FirstByteCheckTimeout:               1 * time.Second,
-		GetResponseReceivedTimeout:          1 * time.Second,
-		WaitDurationAfterSenderCancel:       1 * time.Second,
+		RunServerCmd:                                     []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --key-path=%s --crt-path=%s", pipingServerPkg1_12_8Path, keyPath, certPath)},
+		Concurrency:                                      10,
+		TlsSkipVerifyCert:                                true,
+		SenderResponseBeforeReceiverTimeout:              1 * time.Second,
+		FirstByteCheckTimeout:                            1 * time.Second,
+		GetResponseReceivedTimeout:                       1 * time.Second,
+		WaitDurationAfterSenderCancel:                    1 * time.Second,
+		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
+		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
 	var errorResultNames []string
@@ -83,14 +85,16 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 func TestRunChecksForHTTP1_1(t *testing.T) {
 	checks := AllChecks()
 	config := Config{
-		RunServerCmd:                        []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", pipingServerPkg1_12_8Path)},
-		Concurrency:                         10,
-		SenderResponseBeforeReceiverTimeout: 1 * time.Second,
-		FirstByteCheckTimeout:               1 * time.Second,
-		GetResponseReceivedTimeout:          1 * time.Second,
-		TransferBytePerSec:                  1024 * 1024 * 1024 * 1024,
-		SortedTransferSpans:                 []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
-		WaitDurationAfterSenderCancel:       1 * time.Second,
+		RunServerCmd:                                     []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", pipingServerPkg1_12_8Path)},
+		Concurrency:                                      10,
+		SenderResponseBeforeReceiverTimeout:              1 * time.Second,
+		FirstByteCheckTimeout:                            1 * time.Second,
+		GetResponseReceivedTimeout:                       1 * time.Second,
+		TransferBytePerSec:                               1024 * 1024 * 1024 * 1024,
+		SortedTransferSpans:                              []time.Duration{10 * time.Millisecond, 1 * time.Second, 2 * time.Second},
+		WaitDurationAfterSenderCancel:                    1 * time.Second,
+		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
+		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
@@ -119,6 +123,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "put.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "put.reuse_path", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_cancel_post", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "get_cancel_get", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "service_worker_registration_rejection", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_byte_by_byte_streaming.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
@@ -138,10 +143,12 @@ func TestRunChecksForH2C(t *testing.T) {
 		RunServerCmd: []string{"sh", "-c", fmt.Sprintf("exec %s --http-port=$HTTP_PORT", goPipingServer0_5_0Path)},
 		Concurrency:  10,
 		// Short timeouts are OK because the checks are always timeout when they are long
-		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
-		FirstByteCheckTimeout:               100 * time.Millisecond,
-		GetResponseReceivedTimeout:          100 * time.Millisecond,
-		WaitDurationAfterSenderCancel:       1 * time.Second,
+		SenderResponseBeforeReceiverTimeout:              100 * time.Millisecond,
+		FirstByteCheckTimeout:                            100 * time.Millisecond,
+		GetResponseReceivedTimeout:                       100 * time.Millisecond,
+		WaitDurationAfterSenderCancel:                    1 * time.Second,
+		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
+		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH2c}
 	var errorResultNames []string
@@ -157,6 +164,7 @@ func TestRunChecksForH2C(t *testing.T) {
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_cancel_post",
+		"get_cancel_get",
 	})
 	assert.ElementsMatch(t, warningResultNames, []string{})
 }
@@ -173,11 +181,13 @@ func TestRunChecksForH3(t *testing.T) {
 		TlsSkipVerifyCert: true,
 		Concurrency:       10,
 		// Short timeouts are OK because the checks are always timeout when they are long
-		SenderResponseBeforeReceiverTimeout: 100 * time.Millisecond,
-		FirstByteCheckTimeout:               100 * time.Millisecond,
-		GetResponseReceivedTimeout:          100 * time.Millisecond,
-		GetReqWroteRequestWaitForH3:         0,
-		WaitDurationAfterSenderCancel:       1 * time.Second,
+		SenderResponseBeforeReceiverTimeout:              100 * time.Millisecond,
+		FirstByteCheckTimeout:                            100 * time.Millisecond,
+		GetResponseReceivedTimeout:                       100 * time.Millisecond,
+		GetReqWroteRequestWaitForH3:                      0,
+		WaitDurationAfterSenderCancel:                    1 * time.Second,
+		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
+		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 	}
 	protocols := []Protocol{ProtocolH3}
 	var errorResultNames []string
@@ -193,10 +203,12 @@ func TestRunChecksForH3(t *testing.T) {
 	}
 	assert.ElementsMatch(t, errorResultNames, []string{
 		"post_cancel_post",
+		"get_cancel_get",
 	})
 	assert.ElementsMatch(t, warningResultNames, []string{
 		"get_first",
 		"post_first.same_path_sender_rejection",
 		"put.same_path_sender_rejection",
+		"get_cancel_get",
 	})
 }

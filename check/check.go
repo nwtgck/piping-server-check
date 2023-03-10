@@ -7,6 +7,7 @@ import (
 	"github.com/nwtgck/piping-server-check/http10_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"github.com/quic-go/quic-go/http3"
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -33,19 +34,21 @@ const (
 )
 
 type Config struct {
-	RunServerCmd                        []string
-	HealthCheckPath                     string
-	ServerSchemalessUrl                 string
-	Protocol                            Protocol
-	TlsSkipVerifyCert                   bool
-	Concurrency                         uint
-	SenderResponseBeforeReceiverTimeout time.Duration
-	FirstByteCheckTimeout               time.Duration
-	GetResponseReceivedTimeout          time.Duration
-	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
-	TransferBytePerSec                  int
-	SortedTransferSpans                 []time.Duration
-	WaitDurationAfterSenderCancel       time.Duration
+	RunServerCmd                                     []string
+	HealthCheckPath                                  string
+	ServerSchemalessUrl                              string
+	Protocol                                         Protocol
+	TlsSkipVerifyCert                                bool
+	Concurrency                                      uint
+	SenderResponseBeforeReceiverTimeout              time.Duration
+	FirstByteCheckTimeout                            time.Duration
+	GetResponseReceivedTimeout                       time.Duration
+	GetReqWroteRequestWaitForH3                      time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+	TransferBytePerSec                               int
+	SortedTransferSpans                              []time.Duration
+	WaitDurationAfterSenderCancel                    time.Duration
+	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
+	WaitDurationAfterReceiverCancel                  time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -179,7 +182,28 @@ func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
 
 type Check struct {
 	Name string
-	run  func(config *Config, runCheckResultCh chan<- RunCheckResult)
+	run  func(config *Config, reporter RunCheckReporter)
+}
+
+type RunCheckReporter struct {
+	ch     chan<- RunCheckResult
+	closed *atomic.Bool
+}
+
+func NewRunCheckReporter(ch chan<- RunCheckResult) RunCheckReporter {
+	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false)}
+}
+
+func (r *RunCheckReporter) Report(result RunCheckResult) {
+	if r.closed.Load() {
+		return
+	}
+	r.ch <- result
+}
+
+func (r *RunCheckReporter) Close() {
+	r.closed.Store(true)
+	close(r.ch)
 }
 
 func getCheckName() string {
@@ -284,13 +308,13 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 	return
 }
 
-func prepareServerUrl(config *Config, runCheckResultCh chan<- RunCheckResult) (serverUrl string, ok bool, stopServerIfNeed func()) {
+func prepareServerUrl(config *Config, reporter RunCheckReporter) (serverUrl string, ok bool, stopServerIfNeed func()) {
 	if config.ServerSchemalessUrl == "" {
 		var stopServer func()
 		var resultErrors []ResultError
 		serverUrl, stopServer, resultErrors = prepareServer(config)
 		if len(resultErrors) != 0 {
-			runCheckResultCh <- RunCheckResult{Errors: resultErrors}
+			reporter.Report(RunCheckResult{Errors: resultErrors})
 			return
 		}
 		return serverUrl, true, stopServer
@@ -336,50 +360,50 @@ func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
 	return resultErrors
 }
 
-func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Protocol, runCheckResultCh chan<- RunCheckResult) (*http.Response, bool) {
+func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Protocol, reporter RunCheckReporter) (*http.Response, bool) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", req.Method), err))
+		reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", req.Method), err)))
 		return nil, false
 	}
 	if resultErrors := checkProtocol(resp, protocol); len(resultErrors) != 0 {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors})
 	}
 	if resp.StatusCode != 200 {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode))
+		reporter.Report(NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode)))
 		return nil, false
 	}
 	return resp, true
 }
 
-func checkContentTypeForwarding(getResp *http.Response, expectedContentType string, runCheckResultCh chan<- RunCheckResult) {
+func checkContentTypeForwarding(getResp *http.Response, expectedContentType string, reporter RunCheckReporter) {
 	receivedContentType := getResp.Header.Get("Content-Type")
 	if receivedContentType == expectedContentType {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding})
 	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}})
 	}
 }
 
-func checkContentDispositionForwarding(getResp *http.Response, expectedContentDisposition string, runCheckResultCh chan<- RunCheckResult) {
+func checkContentDispositionForwarding(getResp *http.Response, expectedContentDisposition string, reporter RunCheckReporter) {
 	receivedContentDisposition := getResp.Header.Get("Content-Disposition")
 	if receivedContentDisposition == expectedContentDisposition {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding})
 	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}})
 	}
 }
 
-func checkXRobotsTag(getResp *http.Response, runCheckResultCh chan<- RunCheckResult) {
+func checkXRobotsTag(getResp *http.Response, reporter RunCheckReporter) {
 	receivedXRobotsTag := getResp.Header.Get("X-Robots-Tag")
 	if receivedXRobotsTag == "none" {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone})
 	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}})
 	}
 }
 
-func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan<- RunCheckResult) {
+func checkTransferForReusePath(config *Config, url string, reporter RunCheckReporter) {
 	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer getHttpClient.CloseIdleConnections()
 	postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
@@ -391,10 +415,10 @@ func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan
 	go func() {
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
+			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
 			return
 		}
-		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 		if !getOk {
 			return
 		}
@@ -405,10 +429,10 @@ func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan
 	go func() {
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to create POST request", err)}}
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to create POST request", err)}})
 			return
 		}
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, runCheckResultCh)
+		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
 			return
 		}
@@ -418,21 +442,21 @@ func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan
 	getResp := <-getRespCh
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}})
 		return
 	}
 	if string(bodyBytes) != bodyString {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
-	runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath}
+	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
 	<-postFinishedCh
 }
 
 func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {
-		c.run(config, runCheckResultCh)
+		c.run(config, NewRunCheckReporter(runCheckResultCh))
 	}()
 	for runCheckResult := range runCheckResultCh {
 		var result Result
