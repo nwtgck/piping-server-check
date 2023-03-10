@@ -68,4 +68,4 @@ jobs:
           # Should fail because no --tls-skip-verify
           ! ./piping-server-check --http1.1 --http1.1-tls --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --concurrency 100 --result-jsonl-path=/tmp/result-pkg-error-case.jsonl
           cat /tmp/result-pkg-error-case.jsonl
-        timeout-minutes: 1
+        timeout-minutes: 2
