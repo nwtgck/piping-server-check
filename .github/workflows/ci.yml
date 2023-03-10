@@ -61,7 +61,7 @@ jobs:
           set -eu
           ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --compromise post_cancel_post --compromise get_cancel_get --server-command='exec /tmp/rust/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-rust-normal-case.jsonl
           cat /tmp/result-rust-normal-case.jsonl
-        timeout-minutes: 1
+        timeout-minutes: 2
       - name: Operational test (error case)
         run: |
           set -eu
