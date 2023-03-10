@@ -128,7 +128,7 @@ var rootCmd = &cobra.Command{
 		// TODO: to be option
 		commonConfig.WaitDurationBetweenReceiverWroteRequestAndCancel = 3 * time.Second
 		// TODO: to be option
-		commonConfig.WaitDurationAfterReceiverCancel = 2 * time.Second
+		commonConfig.WaitDurationAfterReceiverCancel = 3 * time.Second
 		commonConfig.TransferBytePerSec = flag.LongTransferBytePerSec
 		slices.Sort(flag.TransferSpans)
 		commonConfig.SortedTransferSpans = flag.TransferSpans
