@@ -98,6 +98,7 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 		getRespCh <- getResp
 	}()
 
+	postContext, postCancel := context.WithCancel(context.Background())
 	postFinishedCh := make(chan struct{})
 	go func() {
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
@@ -105,6 +106,7 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 			runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}}
 			return
 		}
+		postReq = postReq.WithContext(postContext)
 		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, runCheckResultCh)
 		if !postOk {
 			return
@@ -116,6 +118,7 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 	select {
 	case getResp = <-getRespCh:
 	case <-getFailedCh:
+		postCancel()
 		return
 	}
 
