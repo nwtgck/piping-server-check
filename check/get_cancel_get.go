@@ -14,9 +14,9 @@ import (
 func get_cancel_get() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			defer close(runCheckResultCh)
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			defer reporter.Close()
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 			if !ok {
 				return
 			}
@@ -32,7 +32,7 @@ func get_cancel_get() Check {
 				getReqWroteRequestCh := make(chan struct{})
 				getReq1, err := http.NewRequest("GET", url, nil)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
 					return
 				}
 				ctx, cancel := context.WithCancel(context.Background())
@@ -45,7 +45,7 @@ func get_cancel_get() Check {
 				go func() {
 					if config.Protocol == ProtocolH3 {
 						// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
-						runCheckResultCh <- RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. WroteRequest detection not supported in HTTP/3", nil)}}
+						reporter.Report(RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. WroteRequest detection not supported in HTTP/3", nil)}})
 						<-time.After(config.GetReqWroteRequestWaitForH3)
 					} else {
 						<-getReqWroteRequestCh
@@ -58,22 +58,22 @@ func get_cancel_get() Check {
 					return
 				}
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to GET", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to GET", err)))
 					return
 				}
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("expected not to receive a response but GET response received", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("expected not to receive a response but GET response received", err)))
 			}()
 
 			<-canceledCh
 			time.Sleep(config.WaitDurationAfterReceiverCancel)
 
-			checkTransferForGetCancelGet(config, url, runCheckResultCh)
+			checkTransferForGetCancelGet(config, url, reporter)
 			return
 		},
 	}
 }
 
-func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh chan<- RunCheckResult) {
+func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckReporter) {
 	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer getHttpClient.CloseIdleConnections()
 	postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
@@ -86,11 +86,11 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 	go func() {
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
+			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
 			getFailedCh <- struct{}{}
 			return
 		}
-		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 		if !getOk {
 			getFailedCh <- struct{}{}
 			return
@@ -103,11 +103,11 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 	go func() {
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
-			runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}}
+			reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}})
 			return
 		}
 		postReq = postReq.WithContext(postContext)
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, runCheckResultCh)
+		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
 			return
 		}
@@ -124,14 +124,14 @@ func checkTransferForGetCancelGet(config *Config, url string, runCheckResultCh c
 
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
-		runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("failed to read up", err)}}
+		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to read up", err)}})
 		return
 	}
 	if string(bodyBytes) != bodyString {
-		runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("message different", nil)}}
+		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
-	runCheckResultCh <- RunCheckResult{}
+	reporter.Report(RunCheckResult{})
 	<-postFinishedCh
 
 }
