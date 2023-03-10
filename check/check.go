@@ -7,6 +7,7 @@ import (
 	"github.com/nwtgck/piping-server-check/http10_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"github.com/quic-go/quic-go/http3"
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -185,22 +186,22 @@ type Check struct {
 
 type RunCheckReporter struct {
 	ch     chan<- RunCheckResult
-	closed bool
+	closed *atomic.Bool
 }
 
 func NewRunCheckReporter(ch chan<- RunCheckResult) RunCheckReporter {
-	return RunCheckReporter{ch: ch}
+	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false)}
 }
 
 func (r *RunCheckReporter) Report(result RunCheckResult) {
-	if r.closed {
+	if r.closed.Load() {
 		return
 	}
 	r.ch <- result
 }
 
 func (r *RunCheckReporter) Close() {
-	r.closed = true
+	r.closed.Store(true)
 	close(r.ch)
 }
 
