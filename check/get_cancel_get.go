@@ -27,12 +27,14 @@ func get_cancel_get() Check {
 			path := "/" + uuid.NewString()
 			url := serverUrl + path
 
+			getFailed := false
 			canceledCh := make(chan struct{})
 			func() {
 				getReqWroteRequestCh := make(chan struct{})
 				getReq1, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
+					getFailed = true
 					return
 				}
 				ctx, cancel := context.WithCancel(context.Background())
@@ -61,10 +63,15 @@ func get_cancel_get() Check {
 				}
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to GET", err)))
+					getFailed = true
 					return
 				}
 				reporter.Report(NewRunCheckResultWithOneError(NewError("expected not to receive a response but GET response received", err)))
 			}()
+
+			if getFailed {
+				return
+			}
 
 			<-canceledCh
 			time.Sleep(config.WaitDurationAfterReceiverCancel)
