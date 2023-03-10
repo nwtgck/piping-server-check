@@ -34,20 +34,21 @@ const (
 )
 
 type Config struct {
-	RunServerCmd                        []string
-	HealthCheckPath                     string
-	ServerSchemalessUrl                 string
-	Protocol                            Protocol
-	TlsSkipVerifyCert                   bool
-	Concurrency                         uint
-	SenderResponseBeforeReceiverTimeout time.Duration
-	FirstByteCheckTimeout               time.Duration
-	GetResponseReceivedTimeout          time.Duration
-	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
-	TransferBytePerSec                  int
-	SortedTransferSpans                 []time.Duration
-	WaitDurationAfterSenderCancel       time.Duration
-	WaitDurationAfterReceiverCancel     time.Duration
+	RunServerCmd                                     []string
+	HealthCheckPath                                  string
+	ServerSchemalessUrl                              string
+	Protocol                                         Protocol
+	TlsSkipVerifyCert                                bool
+	Concurrency                                      uint
+	SenderResponseBeforeReceiverTimeout              time.Duration
+	FirstByteCheckTimeout                            time.Duration
+	GetResponseReceivedTimeout                       time.Duration
+	GetReqWroteRequestWaitForH3                      time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+	TransferBytePerSec                               int
+	SortedTransferSpans                              []time.Duration
+	WaitDurationAfterSenderCancel                    time.Duration
+	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
+	WaitDurationAfterReceiverCancel                  time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {

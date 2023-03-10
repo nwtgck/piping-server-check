@@ -50,6 +50,8 @@ func get_cancel_get() Check {
 					} else {
 						<-getReqWroteRequestCh
 					}
+					// Difficult to detect whether server handles GET request
+					time.Sleep(config.WaitDurationBetweenReceiverWroteRequestAndCancel)
 					cancel()
 					canceledCh <- struct{}{}
 				}()
@@ -83,6 +85,7 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 
 	getRespCh := make(chan *http.Response)
 	getFailedCh := make(chan struct{})
+	getReqWroteRequestCh := make(chan struct{})
 	go func() {
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -90,6 +93,11 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 			getFailedCh <- struct{}{}
 			return
 		}
+		getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
+			WroteRequest: func(info httptrace.WroteRequestInfo) {
+				getReqWroteRequestCh <- struct{}{}
+			},
+		}))
 		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 		if !getOk {
 			getFailedCh <- struct{}{}
@@ -98,15 +106,20 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		getRespCh <- getResp
 	}()
 
-	postContext, postCancel := context.WithCancel(context.Background())
 	postFinishedCh := make(chan struct{})
 	go func() {
+		if config.Protocol == ProtocolH3 {
+			// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+			reporter.Report(RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. WroteRequest detection not supported in HTTP/3", nil)}})
+			<-time.After(config.GetReqWroteRequestWaitForH3)
+		} else {
+			<-getReqWroteRequestCh
+		}
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}})
 			return
 		}
-		postReq = postReq.WithContext(postContext)
 		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
 			return
@@ -118,7 +131,6 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 	select {
 	case getResp = <-getRespCh:
 	case <-getFailedCh:
-		postCancel()
 		return
 	}
 
