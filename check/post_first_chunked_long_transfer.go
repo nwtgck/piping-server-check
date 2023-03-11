@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"github.com/nwtgck/piping-server-check/util"
 	"golang.org/x/exp/slices"
 	"io"
@@ -43,31 +44,32 @@ func post_first_chunked_long_transfer() Check {
 			sendingReader := util.NewFinishableReader(util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), config.TransferBytePerSec), finishSendReaderCh)
 			expectedReader := rand.New(rand.NewSource(randomSeed))
 
-			postRespArrived := make(chan struct{}, 1)
-			postFinished := make(chan struct{})
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { postFinished <- struct{}{} }()
+				defer postRespOneshot.Done()
 				postReq, err := http.NewRequest("POST", url, sendingReader)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
-				postRespArrived <- struct{}{}
+				postRespOneshot.Send(postResp)
 			}()
 
 			select {
-			case <-postRespArrived:
+			case _, ok := <-postRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			getRespCh := make(chan *http.Response)
-			getFinished := make(chan struct{})
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
@@ -77,12 +79,12 @@ func post_first_chunked_long_transfer() Check {
 				if !getOk {
 					return
 				}
-				getRespCh <- getResp
+				getRespOneshot.Send(getResp)
 			}()
 
 			var getResp *http.Response
 			select {
-			case getResp = <-getRespCh:
+			case getResp = <-getRespOneshot.Channel():
 			case <-time.After(config.GetResponseReceivedTimeout):
 				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
@@ -125,7 +127,7 @@ func post_first_chunked_long_transfer() Check {
 					}
 				}
 			}
-			<-postFinished
+			<-postRespOneshot.Channel()
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
