@@ -158,6 +158,12 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
-	<-postRespOneshot.Channel()
+	postResp, ok := <-postRespOneshot.Channel()
+	if !ok {
+		return
+	}
+	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+		return
+	}
 	reporter.Report(RunCheckResult{})
 }

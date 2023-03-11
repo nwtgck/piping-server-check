@@ -100,8 +100,11 @@ func get_first() Check {
 			}
 
 			// TODO: POST-timeout (already GET)
-			_, ok = <-postRespOneshot.Channel()
+			postResp, ok := <-postRespOneshot.Channel()
 			if !ok {
+				return
+			}
+			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
 				return
 			}
 

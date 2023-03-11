@@ -138,7 +138,13 @@ func post_first_byte_by_byte_streaming() Check {
 				return
 			}
 			// TODO: POST-timeout (already GET)
-			<-postRespOneshot.Channel()
+			postResp, ok := <-postRespOneshot.Channel()
+			if !ok {
+				return
+			}
+			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+				return
+			}
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},

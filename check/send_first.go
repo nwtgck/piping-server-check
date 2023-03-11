@@ -122,8 +122,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 	if !ok {
 		return
 	}
-	if _, err := io.Copy(io.Discard, postResp.Body); err != nil {
-		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
 		return
 	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})

@@ -69,6 +69,8 @@ func post_cancel_post() Check {
 				// TODO: use postResp and transfer data
 				reporter.Report(RunCheckResult{})
 			}
+
+			// TODO: transfer check
 			return
 		},
 	}

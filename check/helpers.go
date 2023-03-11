@@ -130,9 +130,20 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		return
 	}
 	// TODO: POST-timeout (already GET)
-	_, ok = <-postRespOneshot.Channel()
+	postResp, ok := <-postRespOneshot.Channel()
 	if !ok {
 		return
 	}
+	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+		return
+	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
+}
+
+func checkSenderRespReadUp(resp *http.Response, reporter RunCheckReporter) bool {
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+		return false
+	}
+	return true
 }
