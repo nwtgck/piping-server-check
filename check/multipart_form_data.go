@@ -116,6 +116,9 @@ func multipart_form_data() Check {
 				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET body", err)))
 				return
 			}
+			if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+				return
+			}
 			if !bytes.Equal(getBodyBytes, contentBytes) {
 				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}})
 				return

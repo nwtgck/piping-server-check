@@ -127,6 +127,9 @@ func post_first_chunked_long_transfer() Check {
 					}
 				}
 			}
+			if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+				return
+			}
 			postResp, ok := <-postRespOneshot.Channel()
 			if !ok {
 				return

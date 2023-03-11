@@ -154,6 +154,9 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to read up", err)}})
 		return
 	}
+	if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+		return
+	}
 	if string(bodyBytes) != bodyString {
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("message different", nil)}})
 		return

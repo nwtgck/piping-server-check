@@ -94,6 +94,9 @@ func get_first() Check {
 				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
 				return
 			}
+			if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+				return
+			}
 			if string(bodyBytes) != bodyString {
 				reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 				return
