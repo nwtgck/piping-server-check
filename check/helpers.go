@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"io"
 	"net/http"
 	"strings"
@@ -84,8 +85,9 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 
 	bodyString := "message for reuse"
 
-	getRespCh := make(chan *http.Response)
+	getRespOneshot := oneshot.NewOneshot[*http.Response]()
 	go func() {
+		defer getRespOneshot.Done()
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
@@ -95,24 +97,28 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		if !getOk {
 			return
 		}
-		getRespCh <- getResp
+		getRespOneshot.Send(getResp)
 	}()
 
-	postFinishedCh := make(chan struct{})
+	postRespOneshot := oneshot.NewOneshot[*http.Response]()
 	go func() {
+		defer postRespOneshot.Done()
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to create POST request", err)}})
 			return
 		}
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
+		postResp, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
 			return
 		}
-		postFinishedCh <- struct{}{}
+		postRespOneshot.Send(postResp)
 	}()
 
-	getResp := <-getRespCh
+	getResp, ok := <-getRespOneshot.Channel()
+	if !ok {
+		return
+	}
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}})
@@ -122,6 +128,9 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
+	_, ok = <-getRespOneshot.Channel()
+	if !ok {
+		return
+	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
-	<-postFinishedCh
 }
