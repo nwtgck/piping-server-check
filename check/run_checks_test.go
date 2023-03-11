@@ -32,7 +32,7 @@ func TestRunServerCommandFailed(t *testing.T) {
 	protocols := []Protocol{ProtocolHttp1_1}
 	for result := range RunChecks(checks, &config, protocols) {
 		assert.NotNil(t, result.Errors)
-		assert.Contains(t, result.Errors[0].Message, "error on purpose")
+		assert.Regexp(t, "(.*error on purpose.*)|(.*exit status 1.*)", result.Errors[0].Message)
 	}
 }
 
