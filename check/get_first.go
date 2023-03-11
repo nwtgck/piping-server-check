@@ -107,7 +107,7 @@ func get_first() Check {
 			if !ok {
 				return
 			}
-			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+			if ok := checkSenderRespReadUp(SubCheckNameTransferred, postResp, reporter); !ok {
 				return
 			}
 

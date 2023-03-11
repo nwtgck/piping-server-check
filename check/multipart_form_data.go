@@ -127,7 +127,7 @@ func multipart_form_data() Check {
 			if !ok {
 				return
 			}
-			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+			if ok := checkSenderRespReadUp(SubCheckNameTransferred, postResp, reporter); !ok {
 				return
 			}
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})

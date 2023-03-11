@@ -165,7 +165,7 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 	if !ok {
 		return
 	}
-	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+	if ok := checkSenderRespReadUp("", postResp, reporter); !ok {
 		return
 	}
 	reporter.Report(RunCheckResult{})

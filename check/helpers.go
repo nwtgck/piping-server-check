@@ -147,19 +147,19 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 	if !ok {
 		return
 	}
-	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+	if ok := checkSenderRespReadUp(SubCheckNameReusePath, postResp, reporter); !ok {
 		return
 	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
 }
 
-func checkSenderRespReadUp(resp *http.Response, reporter RunCheckReporter) bool {
+func checkSenderRespReadUp(subcheckName string /* empty string OK */, resp *http.Response, reporter RunCheckReporter) bool {
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError("failed to read sender response body", err)}})
 		return false
 	}
 	if err := resp.Body.Close(); err != nil {
-		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close sender response body", err)))
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError("failed to close sender response body", err)}})
 		return false
 	}
 	return true

@@ -125,7 +125,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 	if !ok {
 		return
 	}
-	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+	if ok := checkSenderRespReadUp(SubCheckNameTransferred, postResp, reporter); !ok {
 		return
 	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
