@@ -118,7 +118,14 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 		return
 	}
 	// TODO: POST-timeout (already GET)
-	<-postRespOneshot.Channel()
+	postResp, ok := <-postRespOneshot.Channel()
+	if !ok {
+		return
+	}
+	if _, err := io.Copy(io.Discard, postResp.Body); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+		return
+	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
 	checkTransferForReusePath(config, url, reporter)
