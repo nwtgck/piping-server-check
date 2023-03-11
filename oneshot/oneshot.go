@@ -35,6 +35,11 @@ func NewOneshot[T any]() *Oneshot[T] {
 
 // Send sends value without blocking. Send panics when called multiple times.
 func (o *Oneshot[T]) Send(value T) {
+	select {
+	case <-o.done:
+		panic("send to done oneshot")
+	default:
+	}
 	o.ch <- value
 	close(o.ch)
 }

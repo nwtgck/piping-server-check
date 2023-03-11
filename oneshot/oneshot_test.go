@@ -57,3 +57,11 @@ func TestOneshotSendTwice(t *testing.T) {
 		oneshot.Send("my message 2")
 	})
 }
+
+func TestOneshotSendAfterDone(t *testing.T) {
+	oneshot := NewOneshot[string]()
+	oneshot.Done()
+	assert.Panics(t, func() {
+		oneshot.Send("my message")
+	})
+}
