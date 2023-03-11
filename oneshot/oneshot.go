@@ -33,9 +33,10 @@ func NewOneshot[T any]() *Oneshot[T] {
 	return oneshot
 }
 
-// Send sends value without blocking
+// Send sends value without blocking. Send panics when called multiple times.
 func (o *Oneshot[T]) Send(value T) {
 	o.ch <- value
+	close(o.ch)
 }
 
 // Channel returns a channel to get value. The value is always returned when already Send() called no matter Done() called.
