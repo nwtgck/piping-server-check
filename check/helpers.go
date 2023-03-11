@@ -128,7 +128,7 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
-	_, ok = <-getRespOneshot.Channel()
+	_, ok = <-postRespOneshot.Channel()
 	if !ok {
 		return
 	}
