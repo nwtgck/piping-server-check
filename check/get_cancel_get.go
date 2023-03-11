@@ -145,7 +145,10 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		}
 	}
 
-	getResp := <-getRespOneshot.Channel()
+	getResp, ok := <-getRespOneshot.Channel()
+	if !ok {
+		return
+	}
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to read up", err)}})
