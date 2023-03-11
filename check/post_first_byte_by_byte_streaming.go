@@ -137,6 +137,7 @@ func post_first_byte_by_byte_streaming() Check {
 				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("expected to get EOF", err)}})
 				return
 			}
+			// TODO: POST-timeout (already GET)
 			<-postRespOneshot.Channel()
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return

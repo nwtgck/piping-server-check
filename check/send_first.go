@@ -101,6 +101,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 			getWroteRequestNotForH3 = true
 		},
 	}))
+	// TODO: GET-timeout (fixed-length body)
 	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 	if !getOk {
 		return
@@ -116,6 +117,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 		reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 		return
 	}
+	// TODO: POST-timeout (already GET)
 	<-postRespOneshot.Channel()
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
@@ -139,6 +141,7 @@ func checkSenderConnected(ctx context.Context, config *Config, sendMethod string
 		return
 	}
 	sendReq = sendReq.WithContext(ctx)
+	// TODO: POST-timeout (should be rejected)
 	sendResp, err := sendHttpClient.Do(sendReq)
 	if err != nil {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}})

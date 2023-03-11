@@ -115,6 +115,7 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		postRespOneshot.Send(postResp)
 	}()
 
+	// TODO: GET-timeout (fixed-length body)
 	getResp, ok := <-getRespOneshot.Channel()
 	if !ok {
 		return
@@ -128,6 +129,7 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
+	// TODO: POST-timeout (already GET)
 	_, ok = <-postRespOneshot.Channel()
 	if !ok {
 		return
