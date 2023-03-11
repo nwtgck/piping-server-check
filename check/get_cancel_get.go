@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -91,13 +92,12 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 	bodyString := "my message"
 
 	getRespCh := make(chan *http.Response)
-	getFailedCh := make(chan struct{})
 	getReqWroteRequestCh := make(chan struct{})
 	go func() {
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
-			getFailedCh <- struct{}{}
+			getRespCh <- nil
 			return
 		}
 		getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
@@ -107,14 +107,13 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		}))
 		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 		if !getOk {
-			getFailedCh <- struct{}{}
+			getRespCh <- nil
 			return
 		}
 		getRespCh <- getResp
 	}()
 
-	postFinishedCh := make(chan struct{})
-	postFailedCh := make(chan struct{})
+	postRespCh := make(chan *http.Response)
 	go func() {
 		if config.Protocol == ProtocolH3 {
 			// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
@@ -126,23 +125,27 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}})
-			postFailedCh <- struct{}{}
+			postRespCh <- nil
 			return
 		}
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
+		postResp, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
-			postFailedCh <- struct{}{}
+			postRespCh <- nil
 			return
 		}
-		postFinishedCh <- struct{}{}
+		postRespCh <- postResp
 	}()
 
 	var getResp *http.Response
-	select {
-	case getResp = <-getRespCh:
-	case <-getFailedCh:
-		return
-	case <-postFailedCh:
+	var postResp *http.Response
+	{
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { getResp = <-getRespCh; wg.Done() }()
+		go func() { postResp = <-postRespCh; wg.Done() }()
+		wg.Wait()
+	}
+	if getResp == nil || postResp == nil {
 		return
 	}
 
@@ -156,6 +159,4 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		return
 	}
 	reporter.Report(RunCheckResult{})
-	<-postFinishedCh
-
 }
