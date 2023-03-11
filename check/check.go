@@ -122,10 +122,6 @@ func FailedToRunServerError(err error) ResultError {
 	return ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)}
 }
 
-func NotOkStatusError(status int) ResultError {
-	return ResultError{Message: fmt.Sprintf("not OK status: %d", status)}
-}
-
 func ContentTypeMismatchError(expectedContentType string, actualContentType string) ResultError {
 	return ResultError{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, actualContentType)}
 }

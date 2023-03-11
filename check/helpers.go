@@ -44,7 +44,7 @@ func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Prot
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors})
 	}
 	if resp.StatusCode != 200 {
-		reporter.Report(NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode)))
+		reporter.Report(NewRunCheckResultWithOneError(ResultError{Message: fmt.Sprintf("expected status=200 but status=%d found", resp.StatusCode)}))
 		return nil, false
 	}
 	return resp, true
