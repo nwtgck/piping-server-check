@@ -115,6 +115,17 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		postRespOneshot.Send(postResp)
 	}()
 
+	select {
+	case _, ok := <-getRespOneshot.Channel():
+		if !ok {
+			return
+		}
+	case _, ok := <-postRespOneshot.Channel():
+		if !ok {
+			return
+		}
+	}
+	// TODO: GET-timeout (fixed-length body)
 	getResp, ok := <-getRespOneshot.Channel()
 	if !ok {
 		return
@@ -124,13 +135,40 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}})
 		return
 	}
+	if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+		return
+	}
 	if string(bodyBytes) != bodyString {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
-	_, ok = <-getRespOneshot.Channel()
+	// TODO: POST-timeout (already GET)
+	postResp, ok := <-postRespOneshot.Channel()
 	if !ok {
 		return
 	}
+	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+		return
+	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
+}
+
+func checkSenderRespReadUp(resp *http.Response, reporter RunCheckReporter) bool {
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+		return false
+	}
+	if err := resp.Body.Close(); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close sender response body", err)))
+		return false
+	}
+	return true
+}
+
+func checkCloseReceiverRespBody(resp *http.Response, reporter RunCheckReporter) bool {
+	if err := resp.Body.Close(); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close receiver response body", err)))
+		return false
+	}
+	return true
 }

@@ -82,6 +82,7 @@ func get_first() Check {
 				postRespOneshot.Send(postResp)
 			}()
 
+			// TODO: GET-timeout (fixed-length body)
 			getResp, ok := <-getRespOneshot.Channel()
 			if !ok {
 				return
@@ -93,13 +94,20 @@ func get_first() Check {
 				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
 				return
 			}
+			if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+				return
+			}
 			if string(bodyBytes) != bodyString {
 				reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 				return
 			}
 
-			_, ok = <-postRespOneshot.Channel()
+			// TODO: POST-timeout (already GET)
+			postResp, ok := <-postRespOneshot.Channel()
 			if !ok {
+				return
+			}
+			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
 				return
 			}
 

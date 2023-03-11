@@ -101,6 +101,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 			getWroteRequestNotForH3 = true
 		},
 	}))
+	// TODO: GET-timeout (fixed-length body)
 	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 	if !getOk {
 		return
@@ -112,11 +113,21 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
 		return
 	}
+	if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+		return
+	}
 	if string(bodyBytes) != bodyString {
 		reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 		return
 	}
-	<-postRespOneshot.Channel()
+	// TODO: POST-timeout (already GET)
+	postResp, ok := <-postRespOneshot.Channel()
+	if !ok {
+		return
+	}
+	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+		return
+	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
 	checkTransferForReusePath(config, url, reporter)
@@ -139,6 +150,7 @@ func checkSenderConnected(ctx context.Context, config *Config, sendMethod string
 		return
 	}
 	sendReq = sendReq.WithContext(ctx)
+	// TODO: POST-timeout (should be rejected)
 	sendResp, err := sendHttpClient.Do(sendReq)
 	if err != nil {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}})

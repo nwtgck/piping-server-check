@@ -127,7 +127,16 @@ func post_first_chunked_long_transfer() Check {
 					}
 				}
 			}
-			<-postRespOneshot.Channel()
+			if ok := checkCloseReceiverRespBody(getResp, reporter); !ok {
+				return
+			}
+			postResp, ok := <-postRespOneshot.Channel()
+			if !ok {
+				return
+			}
+			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+				return
+			}
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
