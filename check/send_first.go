@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"github.com/nwtgck/piping-server-check/util"
 	"io"
 	"net/http"
@@ -15,8 +16,8 @@ import (
 func post_first() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			sendFirstRun("POST", config, runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			sendFirstRun("POST", config, reporter)
 		},
 	}
 }
@@ -24,15 +25,15 @@ func post_first() Check {
 func put() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			sendFirstRun("PUT", config, runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			sendFirstRun("PUT", config, reporter)
 		},
 	}
 }
 
-func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- RunCheckResult) {
-	defer close(runCheckResultCh)
-	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) {
+	defer reporter.Close()
+	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 	if !ok {
 		return
 	}
@@ -50,47 +51,49 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 	gettingCh := make(chan struct{}, 1)
 	// h3 does not support httptrace: https://github.com/quic-go/quic-go/issues/3342
 	var getWroteRequestNotForH3 bool
-	postRespCh := make(chan *http.Response, 1)
-	postFinished := make(chan struct{})
+	postRespOneshot := oneshot.NewOneshot[*http.Response]()
 	go func() {
-		defer func() { postFinished <- struct{}{} }()
+		defer postRespOneshot.Done()
 		postReq, err := http.NewRequest(sendMethod, url, strings.NewReader(bodyString))
 		if err != nil {
-			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create POST request", err))
+			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create POST request", err)))
 			return
 		}
 		ensureContentLengthExits(postReq)
 		postReq.Header.Set("Content-Type", contentType)
-		postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+		postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
 			return
 		}
 		// TODO: handle postResp.Body
 		// TODO: not subcheck in HTTP/1.0
 		if getWroteRequestNotForH3 {
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}}
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver, Warnings: []ResultWarning{NewWarning("sender's response header should be arrived before receiver's request", nil)}})
 		} else {
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver}
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSenderResponseBeforeReceiver})
 			if config.Protocol == ProtocolH3 {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Warnings: []ResultWarning{NewWarning("not supported in h3", nil)}}
+				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Warnings: []ResultWarning{NewWarning("not supported in h3", nil)}})
 			} else {
 				ctx, cancel := context.WithCancel(context.Background())
 				go func() { <-gettingCh; cancel() }()
-				checkSenderConnected(ctx, config, sendMethod, url, runCheckResultCh)
+				checkSenderConnected(ctx, config, sendMethod, url, reporter)
 			}
 		}
-		postRespCh <- postResp
+		postRespOneshot.Send(postResp)
 	}()
 
 	select {
-	case <-postRespCh:
+	case _, ok := <-postRespOneshot.Channel():
+		if !ok {
+			return
+		}
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 
 	gettingCh <- struct{}{}
 	getReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
 		return
 	}
 	getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
@@ -98,29 +101,29 @@ func sendFirstRun(sendMethod string, config *Config, runCheckResultCh chan<- Run
 			getWroteRequestNotForH3 = true
 		},
 	}))
-	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 	if !getOk {
 		return
 	}
-	checkContentTypeForwarding(getResp, contentType, runCheckResultCh)
-	checkXRobotsTag(getResp, runCheckResultCh)
+	checkContentTypeForwarding(getResp, contentType, reporter)
+	checkXRobotsTag(getResp, reporter)
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read up", err))
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
 		return
 	}
 	if string(bodyBytes) != bodyString {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError("message different", nil))
+		reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 		return
 	}
-	<-postFinished
-	runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+	<-postRespOneshot.Channel()
+	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
-	checkTransferForReusePath(config, url, runCheckResultCh)
+	checkTransferForReusePath(config, url, reporter)
 	return
 }
 
-func checkSenderConnected(ctx context.Context, config *Config, sendMethod string, url string, runCheckResultCh chan<- RunCheckResult) {
+func checkSenderConnected(ctx context.Context, config *Config, sendMethod string, url string, reporter RunCheckReporter) {
 	sendHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
 	defer sendHttpClient.CloseIdleConnections()
 	var bodyReader io.Reader
@@ -132,18 +135,18 @@ func checkSenderConnected(ctx context.Context, config *Config, sendMethod string
 	}
 	sendReq, err := http.NewRequest(sendMethod, url, bodyReader)
 	if err != nil {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to create %s request", sendMethod), err)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to create %s request", sendMethod), err)}})
 		return
 	}
 	sendReq = sendReq.WithContext(ctx)
 	sendResp, err := sendHttpClient.Do(sendReq)
 	if err != nil {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("failed to %s", sendMethod), err)}})
 		return
 	}
 	if util.IsHttp4xxError(sendResp) {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection})
 	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("expected 4xx status but found: %d", sendResp.StatusCode), nil)}}
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameSamePathSenderRejection, Errors: []ResultError{NewError(fmt.Sprintf("expected 4xx status but found: %d", sendResp.StatusCode), nil)}})
 	}
 }

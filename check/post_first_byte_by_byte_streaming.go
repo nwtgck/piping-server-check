@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
@@ -12,13 +13,13 @@ import (
 func post_first_byte_by_byte_streaming() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			defer close(runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			defer reporter.Close()
 			if slices.Contains([]Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}, config.Protocol) {
 				// Skip because HTTP/1.0 has not chunked encoding
 				return
 			}
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 			if !ok {
 				return
 			}
@@ -31,54 +32,58 @@ func post_first_byte_by_byte_streaming() Check {
 			path := "/" + uuid.NewString()
 			url := serverUrl + path
 
-			postRespArrived := make(chan struct{}, 1)
-			postFinished := make(chan struct{})
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
 			pr, pw := io.Pipe()
 			go func() {
-				defer func() { postFinished <- struct{}{} }()
+				defer postRespOneshot.Done()
 				postReq, err := http.NewRequest("POST", url, pr)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
-				postRespArrived <- struct{}{}
+				postRespOneshot.Send(postResp)
 				// Need to send one byte to GET
 				if _, err := pw.Write([]byte{0}); err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to send request body", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to send request body", err)))
 					return
 				}
 			}()
 
 			select {
-			case <-postRespArrived:
+			case _, ok := <-postRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			getRespCh := make(chan *http.Response)
-			getFinished := make(chan struct{})
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 				if !getOk {
 					return
 				}
-				getRespCh <- getResp
+				getRespOneshot.Send(getResp)
 			}()
 
 			var getResp *http.Response
 			select {
-			case getResp = <-getRespCh:
+			case getResp, ok = <-getRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.GetResponseReceivedTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
+				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
 			}
 
@@ -86,11 +91,11 @@ func post_first_byte_by_byte_streaming() Check {
 			go func() {
 				var buff [1]byte
 				if _, err := io.ReadFull(getResp.Body, buff[:]); err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET response body", err)))
 					return
 				}
 				if buff[0] != 0 {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("different first byte of body", nil))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("different first byte of body", nil)))
 					return
 				}
 				firstByteChecked <- struct{}{}
@@ -99,7 +104,7 @@ func post_first_byte_by_byte_streaming() Check {
 			select {
 			case <-firstByteChecked:
 			case <-time.After(config.FirstByteCheckTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get first byte in %s", config.FirstByteCheckTimeout), nil))
+				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get first byte in %s", config.FirstByteCheckTimeout), nil)))
 				return
 			}
 
@@ -107,33 +112,33 @@ func post_first_byte_by_byte_streaming() Check {
 			for i := 1; i < 256; i++ {
 				writeBytes := []byte{byte(i)}
 				if _, err := pw.Write(writeBytes); err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to send request body", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to send request body", err)))
 					return
 				}
 				if _, err := io.ReadFull(getResp.Body, buff[:]); err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET response body", err)))
 					return
 				}
 				if byte(i) != buff[0] {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("different body: i=%d", i), nil)}}
+					reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("different body: i=%d", i), nil)}})
 					return
 				}
 			}
 			if err := pw.Close(); err != nil {
-				runCheckResultCh <- RunCheckResult{Errors: []ResultError{NewError("failed to close sending body", err)}}
+				reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to close sending body", err)}})
 				return
 			}
 			n, err := getResp.Body.Read(buff[:])
 			if n != 0 {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("expected to read 0 bytes but %d", n), err)}}
+				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError(fmt.Sprintf("expected to read 0 bytes but %d", n), err)}})
 				return
 			}
 			if err != io.EOF {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("expected to get EOF", err)}}
+				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("expected to get EOF", err)}})
 				return
 			}
-			<-postFinished
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+			<-postRespOneshot.Channel()
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
 	}

@@ -123,6 +123,12 @@ var rootCmd = &cobra.Command{
 		// TODO: to be option
 		commonConfig.GetResponseReceivedTimeout = 5 * time.Second
 		commonConfig.GetReqWroteRequestWaitForH3 = 3 * time.Second
+		// TODO: to be option
+		commonConfig.WaitDurationAfterSenderCancel = 1 * time.Second
+		// TODO: to be option
+		commonConfig.WaitDurationBetweenReceiverWroteRequestAndCancel = 3 * time.Second
+		// TODO: to be option
+		commonConfig.WaitDurationAfterReceiverCancel = 3 * time.Second
 		commonConfig.TransferBytePerSec = flag.LongTransferBytePerSec
 		slices.Sort(flag.TransferSpans)
 		commonConfig.SortedTransferSpans = flag.TransferSpans

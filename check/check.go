@@ -7,6 +7,7 @@ import (
 	"github.com/nwtgck/piping-server-check/http10_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"github.com/quic-go/quic-go/http3"
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -33,18 +34,21 @@ const (
 )
 
 type Config struct {
-	RunServerCmd                        []string
-	HealthCheckPath                     string
-	ServerSchemalessUrl                 string
-	Protocol                            Protocol
-	TlsSkipVerifyCert                   bool
-	Concurrency                         uint
-	SenderResponseBeforeReceiverTimeout time.Duration
-	FirstByteCheckTimeout               time.Duration
-	GetResponseReceivedTimeout          time.Duration
-	GetReqWroteRequestWaitForH3         time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
-	TransferBytePerSec                  int
-	SortedTransferSpans                 []time.Duration
+	RunServerCmd                                     []string
+	HealthCheckPath                                  string
+	ServerSchemalessUrl                              string
+	Protocol                                         Protocol
+	TlsSkipVerifyCert                                bool
+	Concurrency                                      uint
+	SenderResponseBeforeReceiverTimeout              time.Duration
+	FirstByteCheckTimeout                            time.Duration
+	GetResponseReceivedTimeout                       time.Duration
+	GetReqWroteRequestWaitForH3                      time.Duration // because httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
+	TransferBytePerSec                               int
+	SortedTransferSpans                              []time.Duration
+	WaitDurationAfterSenderCancel                    time.Duration
+	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
+	WaitDurationAfterReceiverCancel                  time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -178,7 +182,28 @@ func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
 
 type Check struct {
 	Name string
-	run  func(config *Config, runCheckResultCh chan<- RunCheckResult)
+	run  func(config *Config, reporter RunCheckReporter)
+}
+
+type RunCheckReporter struct {
+	ch     chan<- RunCheckResult
+	closed *atomic.Bool
+}
+
+func NewRunCheckReporter(ch chan<- RunCheckResult) RunCheckReporter {
+	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false)}
+}
+
+func (r *RunCheckReporter) Report(result RunCheckResult) {
+	if r.closed.Load() {
+		return
+	}
+	r.ch <- result
+}
+
+func (r *RunCheckReporter) Close() {
+	r.closed.Store(true)
+	close(r.ch)
 }
 
 func getCheckName() string {
@@ -283,13 +308,13 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 	return
 }
 
-func prepareServerUrl(config *Config, runCheckResultCh chan<- RunCheckResult) (serverUrl string, ok bool, stopServerIfNeed func()) {
+func prepareServerUrl(config *Config, reporter RunCheckReporter) (serverUrl string, ok bool, stopServerIfNeed func()) {
 	if config.ServerSchemalessUrl == "" {
 		var stopServer func()
 		var resultErrors []ResultError
 		serverUrl, stopServer, resultErrors = prepareServer(config)
 		if len(resultErrors) != 0 {
-			runCheckResultCh <- RunCheckResult{Errors: resultErrors}
+			reporter.Report(RunCheckResult{Errors: resultErrors})
 			return
 		}
 		return serverUrl, true, stopServer
@@ -309,129 +334,10 @@ func ensureContentLengthExits(req *http.Request) {
 	}
 }
 
-func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
-	var resultErrors []ResultError
-	var versionOk bool
-	switch expectedProto {
-	case ProtocolHttp1_0, ProtocolHttp1_0_tls:
-		versionOk = resp.Proto == "HTTP/1.0"
-	case ProtocolHttp1_1, ProtocolHttp1_1_tls:
-		versionOk = resp.Proto == "HTTP/1.1"
-	case ProtocolH2, ProtocolH2c:
-		versionOk = resp.Proto == "HTTP/2.0"
-	case ProtocolH3:
-		versionOk = resp.Proto == "HTTP/3.0"
-	}
-	if !versionOk {
-		resultErrors = append(resultErrors, NewError(fmt.Sprintf("expected %s but %s", expectedProto, resp.Proto), nil))
-	}
-	shouldUseTls := protocolUsesTls(expectedProto)
-	if shouldUseTls && resp.TLS == nil {
-		resultErrors = append(resultErrors, NewError("should use TLS but not used", nil))
-	}
-	if !shouldUseTls && resp.TLS != nil {
-		resultErrors = append(resultErrors, NewError("should not use TLS but used", nil))
-	}
-	return resultErrors
-}
-
-func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Protocol, runCheckResultCh chan<- RunCheckResult) (*http.Response, bool) {
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to %s", req.Method), err))
-		return nil, false
-	}
-	if resultErrors := checkProtocol(resp, protocol); len(resultErrors) != 0 {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors}
-	}
-	if resp.StatusCode != 200 {
-		runCheckResultCh <- NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode))
-		return nil, false
-	}
-	return resp, true
-}
-
-func checkContentTypeForwarding(getResp *http.Response, expectedContentType string, runCheckResultCh chan<- RunCheckResult) {
-	receivedContentType := getResp.Header.Get("Content-Type")
-	if receivedContentType == expectedContentType {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding}
-	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}}
-	}
-}
-
-func checkContentDispositionForwarding(getResp *http.Response, expectedContentDisposition string, runCheckResultCh chan<- RunCheckResult) {
-	receivedContentDisposition := getResp.Header.Get("Content-Disposition")
-	if receivedContentDisposition == expectedContentDisposition {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding}
-	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}}
-	}
-}
-
-func checkXRobotsTag(getResp *http.Response, runCheckResultCh chan<- RunCheckResult) {
-	receivedXRobotsTag := getResp.Header.Get("X-Robots-Tag")
-	if receivedXRobotsTag == "none" {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone}
-	} else {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}}
-	}
-}
-
-func checkTransferForReusePath(config *Config, url string, runCheckResultCh chan<- RunCheckResult) {
-	getHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
-	defer getHttpClient.CloseIdleConnections()
-	postHttpClient := newHTTPClient(config.Protocol, config.TlsSkipVerifyCert)
-	defer postHttpClient.CloseIdleConnections()
-
-	bodyString := "message for reuse"
-
-	getRespCh := make(chan *http.Response)
-	go func() {
-		getReq, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create GET request", err))
-			return
-		}
-		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
-		if !getOk {
-			return
-		}
-		getRespCh <- getResp
-	}()
-
-	postFinishedCh := make(chan struct{})
-	go func() {
-		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
-		if err != nil {
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to create POST request", err)}}
-			return
-		}
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, runCheckResultCh)
-		if !postOk {
-			return
-		}
-		postFinishedCh <- struct{}{}
-	}()
-
-	getResp := <-getRespCh
-	bodyBytes, err := io.ReadAll(getResp.Body)
-	if err != nil {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("failed to read up", err)}}
-		return
-	}
-	if string(bodyBytes) != bodyString {
-		runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath, Errors: []ResultError{NewError("message different", nil)}}
-		return
-	}
-	runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameReusePath}
-	<-postFinishedCh
-}
-
 func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 	runCheckResultCh := make(chan RunCheckResult)
 	go func() {
-		c.run(config, runCheckResultCh)
+		c.run(config, NewRunCheckReporter(runCheckResultCh))
 	}()
 	for runCheckResult := range runCheckResultCh {
 		var result Result

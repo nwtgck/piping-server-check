@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"github.com/nwtgck/piping-server-check/util"
 	"golang.org/x/exp/slices"
 	"io"
@@ -15,8 +16,8 @@ import (
 func post_first_chunked_long_transfer() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			defer close(runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			defer reporter.Close()
 			if len(config.SortedTransferSpans) == 0 {
 				// skipped
 				return
@@ -26,7 +27,7 @@ func post_first_chunked_long_transfer() Check {
 				// TODO: create both long-transfer with chunked encoding and long-transfer with Content-Length
 				return
 			}
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 			if !ok {
 				return
 			}
@@ -43,48 +44,49 @@ func post_first_chunked_long_transfer() Check {
 			sendingReader := util.NewFinishableReader(util.NewRateLimitReader(rand.New(rand.NewSource(randomSeed)), config.TransferBytePerSec), finishSendReaderCh)
 			expectedReader := rand.New(rand.NewSource(randomSeed))
 
-			postRespArrived := make(chan struct{}, 1)
-			postFinished := make(chan struct{})
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { postFinished <- struct{}{} }()
+				defer postRespOneshot.Done()
 				postReq, err := http.NewRequest("POST", url, sendingReader)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
-				postRespArrived <- struct{}{}
+				postRespOneshot.Send(postResp)
 			}()
 
 			select {
-			case <-postRespArrived:
+			case _, ok := <-postRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			getRespCh := make(chan *http.Response)
-			getFinished := make(chan struct{})
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 				if !getOk {
 					return
 				}
-				getRespCh <- getResp
+				getRespOneshot.Send(getResp)
 			}()
 
 			var getResp *http.Response
 			select {
-			case getResp = <-getRespCh:
+			case getResp = <-getRespOneshot.Channel():
 			case <-time.After(config.GetResponseReceivedTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
+				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
 			}
 
@@ -100,21 +102,21 @@ func post_first_chunked_long_transfer() Check {
 					break
 				}
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET response body", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET response body", err)))
 					return
 				}
 				totalReadByte += n
 				if _, err := io.ReadFull(expectedReader, expectedBuff[0:n]); err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read expected reader", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read expected reader", err)))
 					return
 				}
 				if !bytes.Equal(buff[:n], expectedBuff[:n]) {
-					runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}}
+					reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}})
 					return
 				}
 				if time.Since(startTime) >= transferSpan {
 					if !readerFinishSent {
-						runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNamePartialTransfer, Message: fmt.Sprintf("%v: %s transferred", transferSpan, util.HumanizeBytes(float64(totalReadByte)))}
+						reporter.Report(RunCheckResult{SubCheckName: SubCheckNamePartialTransfer, Message: fmt.Sprintf("%v: %s transferred", transferSpan, util.HumanizeBytes(float64(totalReadByte)))})
 					}
 					if i == len(config.SortedTransferSpans)-1 && !readerFinishSent {
 						finishSendReaderCh <- struct{}{}
@@ -125,8 +127,8 @@ func post_first_chunked_long_transfer() Check {
 					}
 				}
 			}
-			<-postFinished
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+			<-postRespOneshot.Channel()
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"io"
 	"math/rand"
 	"mime/multipart"
@@ -15,9 +16,9 @@ import (
 func multipart_form_data() Check {
 	return Check{
 		Name: getCheckName(),
-		run: func(config *Config, runCheckResultCh chan<- RunCheckResult) {
-			defer close(runCheckResultCh)
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, runCheckResultCh)
+		run: func(config *Config, reporter RunCheckReporter) {
+			defer reporter.Close()
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
 			if !ok {
 				return
 			}
@@ -47,79 +48,80 @@ func multipart_form_data() Check {
 			contentType := multipartWriter.FormDataContentType()
 			part, err := multipartWriter.CreatePart(multipartHeader)
 			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create part", err)))
 				return
 			}
 			if _, err = io.Copy(part, bytes.NewReader(contentBytes)); err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to write content to part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to write content to part", err)))
 				return
 			}
 			if err = multipartWriter.Close(); err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to close part", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close part", err)))
 				return
 			}
 
-			postRespArrived := make(chan struct{}, 1)
-			postFinished := make(chan struct{})
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { postFinished <- struct{}{} }()
+				defer postRespOneshot.Done()
 				postReq, err := http.NewRequest("POST", url, bodyBuffer)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
 				ensureContentLengthExits(postReq)
 				postReq.Header.Set("Content-Type", contentType)
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, runCheckResultCh)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
-				postRespArrived <- struct{}{}
+				postRespOneshot.Send(postResp)
 			}()
 
 			select {
-			case <-postRespArrived:
+			case _, ok := <-postRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			getRespCh := make(chan *http.Response)
-			getFinished := make(chan struct{})
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
-					runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to create request", err))
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
 					return
 				}
-				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, runCheckResultCh)
+				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 				if !getOk {
 					return
 				}
-				getRespCh <- getResp
+				getRespOneshot.Send(getResp)
 			}()
 
 			var getResp *http.Response
 			select {
-			case getResp = <-getRespCh:
+			case getResp = <-getRespOneshot.Channel():
 			case <-time.After(config.GetResponseReceivedTimeout):
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil))
+				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
 			}
 
-			checkContentTypeForwarding(getResp, multipartHeaderContentType, runCheckResultCh)
-			checkContentDispositionForwarding(getResp, multipartHeaderDisposition, runCheckResultCh)
+			checkContentTypeForwarding(getResp, multipartHeaderContentType, reporter)
+			checkContentDispositionForwarding(getResp, multipartHeaderDisposition, reporter)
 
 			getBodyBytes, err := io.ReadAll(getResp.Body)
 			if err != nil {
-				runCheckResultCh <- NewRunCheckResultWithOneError(NewError("failed to read GET body", err))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read GET body", err)))
 				return
 			}
 			if !bytes.Equal(getBodyBytes, contentBytes) {
-				runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}}
+				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}})
 				return
 			}
-			<-postFinished
-			runCheckResultCh <- RunCheckResult{SubCheckName: SubCheckNameTransferred}
+			<-postRespOneshot.Channel()
+			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
 	}
