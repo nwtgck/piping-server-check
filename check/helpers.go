@@ -145,5 +145,9 @@ func checkSenderRespReadUp(resp *http.Response, reporter RunCheckReporter) bool 
 		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
 		return false
 	}
+	if err := resp.Body.Close(); err != nil {
+		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close sender response body", err)))
+		return false
+	}
 	return true
 }
