@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"io"
 	"math/rand"
 	"mime/multipart"
@@ -59,10 +60,9 @@ func multipart_form_data() Check {
 				return
 			}
 
-			postRespArrived := make(chan struct{}, 1)
-			postFinished := make(chan struct{})
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { postFinished <- struct{}{} }()
+				defer postRespOneshot.Done()
 				postReq, err := http.NewRequest("POST", url, bodyBuffer)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
@@ -70,22 +70,24 @@ func multipart_form_data() Check {
 				}
 				ensureContentLengthExits(postReq)
 				postReq.Header.Set("Content-Type", contentType)
-				_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
 				if !postOk {
 					return
 				}
-				postRespArrived <- struct{}{}
+				postRespOneshot.Send(postResp)
 			}()
 
 			select {
-			case <-postRespArrived:
+			case _, ok := <-postRespOneshot.Channel():
+				if !ok {
+					return
+				}
 			case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 			}
 
-			getRespCh := make(chan *http.Response)
-			getFinished := make(chan struct{})
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create request", err)))
@@ -95,12 +97,12 @@ func multipart_form_data() Check {
 				if !getOk {
 					return
 				}
-				getRespCh <- getResp
+				getRespOneshot.Send(getResp)
 			}()
 
 			var getResp *http.Response
 			select {
-			case getResp = <-getRespCh:
+			case getResp = <-getRespOneshot.Channel():
 			case <-time.After(config.GetResponseReceivedTimeout):
 				reporter.Report(NewRunCheckResultWithOneError(NewError(fmt.Sprintf("failed to get receiver's response in %s", config.GetResponseReceivedTimeout), nil)))
 				return
@@ -118,7 +120,7 @@ func multipart_form_data() Check {
 				reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred, Errors: []ResultError{NewError("different body", nil)}})
 				return
 			}
-			<-postFinished
+			<-postRespOneshot.Channel()
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 			return
 		},
