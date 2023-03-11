@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"github.com/nwtgck/piping-server-check/util"
 	"io"
 	"net/http"
@@ -50,10 +51,9 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 	gettingCh := make(chan struct{}, 1)
 	// h3 does not support httptrace: https://github.com/quic-go/quic-go/issues/3342
 	var getWroteRequestNotForH3 bool
-	postRespCh := make(chan *http.Response, 1)
-	postFinished := make(chan struct{})
+	postRespOneshot := oneshot.NewOneshot[*http.Response]()
 	go func() {
-		defer func() { postFinished <- struct{}{} }()
+		defer postRespOneshot.Done()
 		postReq, err := http.NewRequest(sendMethod, url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create POST request", err)))
@@ -79,11 +79,14 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 				checkSenderConnected(ctx, config, sendMethod, url, reporter)
 			}
 		}
-		postRespCh <- postResp
+		postRespOneshot.Send(postResp)
 	}()
 
 	select {
-	case <-postRespCh:
+	case _, ok := <-postRespOneshot.Channel():
+		if !ok {
+			return
+		}
 	case <-time.After(config.SenderResponseBeforeReceiverTimeout):
 	}
 
@@ -113,7 +116,7 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 		reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 		return
 	}
-	<-postFinished
+	<-postRespOneshot.Channel()
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
 	checkTransferForReusePath(config, url, reporter)
