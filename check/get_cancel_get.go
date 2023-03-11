@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -90,14 +91,13 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 
 	bodyString := "my message"
 
-	getRespCh := make(chan *http.Response)
-	getFailedCh := make(chan struct{})
+	getRespOneshot := oneshot.NewOneshot[*http.Response]()
 	getReqWroteRequestCh := make(chan struct{})
 	go func() {
+		defer getRespOneshot.Done()
 		getReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
-			getFailedCh <- struct{}{}
 			return
 		}
 		getReq = getReq.WithContext(httptrace.WithClientTrace(getReq.Context(), &httptrace.ClientTrace{
@@ -107,15 +107,14 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		}))
 		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 		if !getOk {
-			getFailedCh <- struct{}{}
 			return
 		}
-		getRespCh <- getResp
+		getRespOneshot.Send(getResp)
 	}()
 
-	postFinishedCh := make(chan struct{})
-	postFailedCh := make(chan struct{})
+	postRespOneshot := oneshot.NewOneshot[*http.Response]()
 	go func() {
+		defer postRespOneshot.Done()
 		if config.Protocol == ProtocolH3 {
 			// httptrace not supported: https://github.com/quic-go/quic-go/issues/3342
 			reporter.Report(RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. WroteRequest detection not supported in HTTP/3", nil)}})
@@ -126,26 +125,27 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
 		if err != nil {
 			reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to create POST request", err)}})
-			postFailedCh <- struct{}{}
 			return
 		}
-		_, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
+		postResp, postOk := sendOrGetAndCheck(getHttpClient, postReq, config.Protocol, reporter)
 		if !postOk {
-			postFailedCh <- struct{}{}
 			return
 		}
-		postFinishedCh <- struct{}{}
+		postRespOneshot.Send(postResp)
 	}()
 
-	var getResp *http.Response
 	select {
-	case getResp = <-getRespCh:
-	case <-getFailedCh:
-		return
-	case <-postFailedCh:
-		return
+	case _, ok := <-getRespOneshot.Channel():
+		if !ok {
+			return
+		}
+	case _, ok := <-postRespOneshot.Channel():
+		if !ok {
+			return
+		}
 	}
 
+	getResp := <-getRespOneshot.Channel()
 	bodyBytes, err := io.ReadAll(getResp.Body)
 	if err != nil {
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("failed to read up", err)}})
@@ -155,7 +155,6 @@ func checkTransferForGetCancelGet(config *Config, url string, reporter RunCheckR
 		reporter.Report(RunCheckResult{Errors: []ResultError{NewError("message different", nil)}})
 		return
 	}
+	<-postRespOneshot.Channel()
 	reporter.Report(RunCheckResult{})
-	<-postFinishedCh
-
 }
