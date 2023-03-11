@@ -2,6 +2,7 @@ package check
 
 import (
 	"github.com/google/uuid"
+	"github.com/nwtgck/piping-server-check/oneshot"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -29,11 +30,10 @@ func get_first() Check {
 			url := serverUrl + path
 
 			contentType := "text/plain"
+			getRespOneshot := oneshot.NewOneshot[*http.Response]()
 			getReqWroteRequestCh := make(chan struct{})
-			getReqFailedCh := make(chan struct{})
-			getFinished := make(chan struct{})
 			go func() {
-				defer func() { getFinished <- struct{}{} }()
+				defer getRespOneshot.Done()
 				getReq, err := http.NewRequest("GET", url, nil)
 				if err != nil {
 					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create GET request", err)))
@@ -46,20 +46,9 @@ func get_first() Check {
 				}))
 				getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
 				if !getOk {
-					getReqFailedCh <- struct{}{}
 					return
 				}
-				checkContentTypeForwarding(getResp, contentType, reporter)
-				checkXRobotsTag(getResp, reporter)
-				bodyBytes, err := io.ReadAll(getResp.Body)
-				if err != nil {
-					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
-					return
-				}
-				if string(bodyBytes) != bodyString {
-					reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
-					return
-				}
+				getRespOneshot.Send(getResp)
 			}()
 
 			if config.Protocol == ProtocolH3 {
@@ -70,22 +59,50 @@ func get_first() Check {
 				// Wait for the GET request
 				select {
 				case <-getReqWroteRequestCh:
-				case <-getReqFailedCh:
-					return
+				case _, ok := <-getRespOneshot.Channel():
+					if !ok {
+						return
+					}
 				}
 			}
 
-			postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+			postRespOneshot := oneshot.NewOneshot[*http.Response]()
+			go func() {
+				defer postRespOneshot.Done()
+				postReq, err := http.NewRequest("POST", url, strings.NewReader(bodyString))
+				if err != nil {
+					reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create POST request", err)))
+					return
+				}
+				postReq.Header.Set("Content-Type", contentType)
+				postResp, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
+				if !postOk {
+					return
+				}
+				postRespOneshot.Send(postResp)
+			}()
+
+			getResp, ok := <-getRespOneshot.Channel()
+			if !ok {
+				return
+			}
+			checkContentTypeForwarding(getResp, contentType, reporter)
+			checkXRobotsTag(getResp, reporter)
+			bodyBytes, err := io.ReadAll(getResp.Body)
 			if err != nil {
-				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to create POST request", err)))
+				reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read up", err)))
 				return
 			}
-			postReq.Header.Set("Content-Type", contentType)
-			_, postOk := sendOrGetAndCheck(postHttpClient, postReq, config.Protocol, reporter)
-			if !postOk {
+			if string(bodyBytes) != bodyString {
+				reporter.Report(NewRunCheckResultWithOneError(NewError("message different", nil)))
 				return
 			}
-			<-getFinished
+
+			_, ok = <-postRespOneshot.Channel()
+			if !ok {
+				return
+			}
+
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})
 
 			checkTransferForReusePath(config, url, reporter)
