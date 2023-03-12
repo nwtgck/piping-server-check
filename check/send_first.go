@@ -101,9 +101,17 @@ func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) 
 			getWroteRequestNotForH3 = true
 		},
 	}))
-	// TODO: GET-timeout (fixed-length body)
-	getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
-	if !getOk {
+	getRespOneshot := oneshot.NewOneshot[*http.Response]()
+	go func() {
+		defer getRespOneshot.Done()
+		getResp, getOk := sendOrGetAndCheck(getHttpClient, getReq, config.Protocol, reporter)
+		if !getOk {
+			return
+		}
+		getRespOneshot.Send(getResp)
+	}()
+	getResp, ok := respWithTimeout("", "GET", getRespOneshot, config.FixedLengthBodyGetTimeout, reporter)
+	if !ok {
 		return
 	}
 	checkContentTypeForwarding(getResp, contentType, reporter)

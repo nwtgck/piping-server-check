@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
@@ -125,8 +126,7 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 			return
 		}
 	}
-	// TODO: GET-timeout (fixed-length body)
-	getResp, ok := <-getRespOneshot.Channel()
+	getResp, ok := respWithTimeout(SubCheckNameReusePath, "GET", getRespOneshot, config.FixedLengthBodyGetTimeout, reporter)
 	if !ok {
 		return
 	}
@@ -151,6 +151,21 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 		return
 	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
+}
+
+func respWithTimeout(subcheckName string /* empty string OK */, methodName string, respOneshot *oneshot.Oneshot[*http.Response], timeout time.Duration, reporter RunCheckReporter) (*http.Response, bool) {
+	var resp *http.Response
+	var ok bool
+	select {
+	case resp, ok = <-respOneshot.Channel():
+		if !ok {
+			return nil, false
+		}
+		return resp, true
+	case <-time.After(timeout):
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError(fmt.Sprintf("failed to receive a %s response in %v", methodName, timeout), nil)}})
+		return nil, false
+	}
 }
 
 func checkSenderRespReadUp(subcheckName string /* empty string OK */, resp *http.Response, reporter RunCheckReporter) bool {

@@ -49,6 +49,7 @@ type Config struct {
 	WaitDurationAfterSenderCancel                    time.Duration
 	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
 	WaitDurationAfterReceiverCancel                  time.Duration
+	FixedLengthBodyGetTimeout                        time.Duration
 }
 
 func protocolUsesTls(protocol Protocol) bool {
