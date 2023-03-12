@@ -137,10 +137,6 @@ func NewWarning(message string, err error) ResultWarning {
 	return ResultWarning{Message: fmt.Sprintf("%s: %+v", message, err)}
 }
 
-func XRobotsTagNoneWarning(actualValue string) ResultWarning {
-	return ResultWarning{Message: fmt.Sprintf("X-Robots-Tag: none is recommeded but found '%+v'", actualValue)}
-}
-
 type Result struct {
 	// result name can be "<check name>.<subcheck name>" or "<check name>"
 	Name      string          `json:"name"`

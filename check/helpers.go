@@ -73,7 +73,7 @@ func checkXRobotsTag(getResp *http.Response, reporter RunCheckReporter) {
 	if receivedXRobotsTag == "none" {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{{Message: fmt.Sprintf("X-Robots-Tag: none is recommeded but found '%+v'", receivedXRobotsTag)}}})
 	}
 }
 
