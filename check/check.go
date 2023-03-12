@@ -50,6 +50,7 @@ type Config struct {
 	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
 	WaitDurationAfterReceiverCancel                  time.Duration
 	FixedLengthBodyGetTimeout                        time.Duration
+	NSimultaneousRequests                            int
 }
 
 func protocolUsesTls(protocol Protocol) bool {

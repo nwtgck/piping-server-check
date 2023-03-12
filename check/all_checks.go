@@ -5,6 +5,7 @@ func AllChecks() []Check {
 		post_first(),
 		get_first(),
 		put(),
+		simultaneous_request(),
 		post_cancel_post(),
 		get_cancel_get(),
 		service_worker_registration_rejection(),
