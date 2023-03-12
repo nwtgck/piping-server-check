@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -225,22 +224,19 @@ func waitHTTPServer(httpClient *http.Client, healthCheckUrl string) {
 		if err == nil && (200 <= resp.StatusCode && resp.StatusCode < 300) {
 			return
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
-// To avoid port already used error
-var prepareServerMutex = new(sync.Mutex)
+var portPool = util.NewPortPool()
 
 func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
-	prepareServerMutex.Lock()
-	defer prepareServerMutex.Unlock()
-	httpPort, err := util.GetTCPPort()
+	httpPort, err := portPool.GetAndReserve()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
 	}
-	httpsPort, err := util.GetTCPAndUDPPort()
+	httpsPort, err := portPool.GetAndReserve()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
@@ -272,6 +268,8 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 
 	stopSerer = func() {
 		cmd.Process.Signal(syscall.SIGTERM)
+		portPool.Release(httpPort)
+		portPool.Release(httpsPort)
 	}
 	serverPort := httpPort
 	if protocolUsesTls(config.Protocol) {
