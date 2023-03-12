@@ -118,10 +118,6 @@ func FailedToGetPortError() ResultError {
 	return ResultError{Message: "failed to get port"}
 }
 
-func FailedToRunServerError(err error) ResultError {
-	return ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)}
-}
-
 type ResultWarning struct {
 	Message string `json:"message"`
 }
@@ -250,7 +246,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 
 	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort)
 	if err != nil {
-		resultErrors = append(resultErrors, FailedToRunServerError(err))
+		resultErrors = append(resultErrors, ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)})
 		return
 	}
 
