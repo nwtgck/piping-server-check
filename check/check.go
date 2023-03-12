@@ -152,6 +152,7 @@ type Result struct {
 }
 
 // Subcheck name is top-level. The same subcheck names in different checks should be the same meaning.
+// Purpose: Compromise in a narrow area not the entire check.
 const (
 	SubCheckNameProtocol                     = "protocol"
 	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
