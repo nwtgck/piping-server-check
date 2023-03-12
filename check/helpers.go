@@ -55,7 +55,7 @@ func checkContentTypeForwarding(getResp *http.Response, expectedContentType stri
 	if receivedContentType == expectedContentType {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, receivedContentType)}}})
 	}
 }
 
@@ -64,7 +64,7 @@ func checkContentDispositionForwarding(getResp *http.Response, expectedContentDi
 	if receivedContentDisposition == expectedContentDisposition {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{{Message: fmt.Sprintf("Content-Disposition should be %s but found %s", expectedContentDisposition, receivedContentDisposition)}}})
 	}
 }
 

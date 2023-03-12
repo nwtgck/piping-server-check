@@ -122,10 +122,6 @@ func FailedToRunServerError(err error) ResultError {
 	return ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)}
 }
 
-func ContentTypeMismatchError(expectedContentType string, actualContentType string) ResultError {
-	return ResultError{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, actualContentType)}
-}
-
 type ResultWarning struct {
 	Message string `json:"message"`
 }
