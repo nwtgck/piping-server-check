@@ -3,7 +3,7 @@ module github.com/nwtgck/piping-server-check
 go 1.19
 
 require (
-	github.com/fatih/color v1.14.1
+	github.com/fatih/color v1.15.0
 	github.com/google/uuid v1.3.0
 	github.com/k0kubun/pp/v3 v3.2.0
 	github.com/quic-go/quic-go v0.33.0
