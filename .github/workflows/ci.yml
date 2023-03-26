@@ -53,7 +53,7 @@ jobs:
       - name: Operational test (pkg) (normal case)
         run: |
           set -eu
-          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --compromise simultaneous_request --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --n-simultaneous-requests 10 --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-pkg-normal-case.jsonl
+          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --n-simultaneous-requests 10 --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-pkg-normal-case.jsonl
           cat /tmp/result-pkg-normal-case.jsonl
         timeout-minutes: 2
       # Purpose: Find out how the latest piping-server-check affects piping-server-rust

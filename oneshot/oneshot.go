@@ -53,12 +53,6 @@ func (o *Oneshot[T]) Channel() <-chan T {
 		close(ch)
 		return ch
 	}
-	select {
-	case <-o.done:
-		close(ch)
-		return ch
-	default:
-	}
 	go func() {
 		o.wg.Wait()
 		if o.cached {
