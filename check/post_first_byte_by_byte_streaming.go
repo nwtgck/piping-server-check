@@ -145,7 +145,7 @@ func post_first_byte_by_byte_streaming() Check {
 			if !ok {
 				return
 			}
-			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+			if ok := checkSenderRespReadUp(SubCheckNameTransferred, postResp, reporter); !ok {
 				return
 			}
 			reporter.Report(RunCheckResult{SubCheckName: SubCheckNameTransferred})

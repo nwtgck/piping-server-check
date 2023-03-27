@@ -11,9 +11,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: "1.20"
       - name: Build
         run: CGO_ENABLED=0 go build -o piping-server-check main/main.go
       # Without this, HTTP/3 client causes an error "failed to sufficiently increase receive buffer size (was: 208 kiB, wanted: 2048 kiB, got: 416 kiB)": https://github.com/quic-go/quic-go/wiki/UDP-Receive-Buffer-Size
@@ -30,9 +30,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: 1.19
+          go-version: "1.20"
       - name: Build
         run: CGO_ENABLED=0 go build -o piping-server-check main/main.go
       # Without this, HTTP/3 client causes an error "failed to sufficiently increase receive buffer size (was: 208 kiB, wanted: 2048 kiB, got: 416 kiB)": https://github.com/quic-go/quic-go/wiki/UDP-Receive-Buffer-Size
@@ -53,19 +53,21 @@ jobs:
       - name: Operational test (pkg) (normal case)
         run: |
           set -eu
-          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-pkg-normal-case.jsonl
+          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --n-simultaneous-requests 10 --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-pkg-normal-case.jsonl
           cat /tmp/result-pkg-normal-case.jsonl
-        timeout-minutes: 1
+        timeout-minutes: 2
+      # Purpose: Find out how the latest piping-server-check affects piping-server-rust
       - name: Operational test (Rust) (normal case)
         run: |
           set -eu
-          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --compromise post_cancel_post --compromise get_cancel_get --server-command='exec /tmp/rust/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-rust-normal-case.jsonl
+          ./piping-server-check --http1.1 --http1.1-tls --h2 --tls-skip-verify --compromise post_cancel_post --compromise get_cancel_get --compromise simultaneous_request --server-command='exec /tmp/rust/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --n-simultaneous-requests 30 --transfer-speed-byte $((1024 * 1024 * 1024 * 1024)) --transfer-span 1s --transfer-span 2s --transfer-span 3s --concurrency 100 --result-jsonl-path=/tmp/result-rust-normal-case.jsonl
           cat /tmp/result-rust-normal-case.jsonl
         timeout-minutes: 2
+      # Purpose: Ensure existing with non-zero code
       - name: Operational test (error case)
         run: |
           set -eu
           # Should fail because no --tls-skip-verify
-          ! ./piping-server-check --http1.1 --http1.1-tls --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --concurrency 100 --result-jsonl-path=/tmp/result-pkg-error-case.jsonl
+          ! ./piping-server-check --http1.1 --http1.1-tls --server-command='exec /tmp/piping-server --http-port=$HTTP_PORT --enable-https --https-port=$HTTPS_PORT --crt-path=/tmp/ssl_certs/server.crt --key-path=/tmp/ssl_certs/server.key' --n-simultaneous-requests 1 --concurrency 100 --result-jsonl-path=/tmp/result-pkg-error-case.jsonl
           cat /tmp/result-pkg-error-case.jsonl
         timeout-minutes: 2

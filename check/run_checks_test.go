@@ -26,13 +26,16 @@ func init() {
 func TestRunServerCommandFailed(t *testing.T) {
 	checks := AllChecks()
 	config := Config{
-		RunServerCmd: []string{"sh", "-c", "echo 'error on purpose' > /dev/stderr && exit 1"},
-		Concurrency:  1,
+		RunServerCmd:          []string{"sh", "-c", "echo 'error on purpose' > /dev/stderr && exit 1"},
+		Concurrency:           1,
+		NSimultaneousRequests: 1,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	for result := range RunChecks(checks, &config, protocols) {
-		assert.NotNil(t, result.Errors)
-		assert.Regexp(t, "(.*error on purpose.*)|(.*exit status 1.*)", result.Errors[0].Message)
+		if result.Name != simultaneous_request().Name {
+			assert.NotNil(t, result.Errors)
+			assert.Regexp(t, "(.*error on purpose.*)|(.*exit status 1.*)", result.Errors[0].Message)
+		}
 	}
 }
 
@@ -53,6 +56,8 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		WaitDurationAfterSenderCancel:                    1 * time.Second,
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
+		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
 	var errorResultNames []string
@@ -95,6 +100,8 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		WaitDurationAfterSenderCancel:                    1 * time.Second,
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
+		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
 	var results []Result
@@ -129,6 +136,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		{Name: "multipart_form_data.content_type_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "multipart_form_data.content_disposition_forwarding", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "multipart_form_data.transferred", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
+		{Name: "simultaneous_request", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
 		{Name: "post_first_chunked_long_transfer.partial_transfer", Protocol: ProtocolHttp1_1, OkForJson: truePointer},
@@ -149,6 +157,8 @@ func TestRunChecksForH2C(t *testing.T) {
 		WaitDurationAfterSenderCancel:                    1 * time.Second,
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
+		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolH2c}
 	var errorResultNames []string
@@ -188,6 +198,8 @@ func TestRunChecksForH3(t *testing.T) {
 		WaitDurationAfterSenderCancel:                    1 * time.Second,
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
+		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolH3}
 	var errorResultNames []string

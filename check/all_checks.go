@@ -11,7 +11,8 @@ func AllChecks() []Check {
 		post_first_byte_by_byte_streaming(),
 		multipart_form_data(),
 
-		// long check
+		// long checks
+		simultaneous_request(),
 		post_first_chunked_long_transfer(),
 	}
 }

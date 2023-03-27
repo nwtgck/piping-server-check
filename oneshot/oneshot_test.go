@@ -11,19 +11,22 @@ func TestOneshotCached(t *testing.T) {
 	oneshot.Send("my message")
 	// value got
 	{
-		value := <-oneshot.Channel()
+		value, ok := <-oneshot.Channel()
 		assert.Equal(t, "my message", value)
+		assert.Equal(t, true, ok)
 	}
 	// value got again
 	{
-		value := <-oneshot.Channel()
+		value, ok := <-oneshot.Channel()
 		assert.Equal(t, "my message", value)
+		assert.Equal(t, true, ok)
 	}
 	oneshot.Done()
 	// value got after done
 	{
-		value := <-oneshot.Channel()
+		value, ok := <-oneshot.Channel()
 		assert.Equal(t, "my message", value)
+		assert.Equal(t, true, ok)
 	}
 }
 
@@ -44,9 +47,10 @@ func TestOneshotChannelClosed(t *testing.T) {
 	// channel from .Channel() is closed after value got
 	{
 		ch := oneshot.Channel()
-		var _ = <-ch
-		_, ok := <-ch
-		assert.Equal(t, false, ok)
+		_, ok1 := <-ch
+		assert.Equal(t, true, ok1)
+		_, ok2 := <-ch
+		assert.Equal(t, false, ok2)
 	}
 }
 

@@ -31,6 +31,7 @@ var flag struct {
 	LongTransferBytePerSec int             `json:"long_transfer_speed_byte,omitempty"`
 	TransferSpans          []time.Duration `json:"-"`
 	TransferSpansForJson   []jsonDuration  `json:"transfer_spans,omitempty"`
+	NSimultaneousRequests  int             `json:"n_simultaneous_requests"`
 	Concurrency            uint            `json:"concurrency"`
 	ResultJSONLPath        string          `json:"result_jsonl_path,omitempty"`
 }
@@ -59,6 +60,7 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVarP(&flag.Compromises, "compromise", "", nil, "Compromise results which have errors and exit 0 if no other errors exist (e.g. --compromise get_first --compromise http1.1/put.transferred)")
 	rootCmd.PersistentFlags().IntVarP(&flag.LongTransferBytePerSec, "transfer-speed-byte", "", 1024*1024, "transfer byte-per-second used in long transfer checks")
 	rootCmd.PersistentFlags().DurationSliceVarP(&flag.TransferSpans, "transfer-span", "", nil, "transfer spans used in long transfer checks (e.g. 3s)")
+	rootCmd.PersistentFlags().IntVarP(&flag.NSimultaneousRequests, "n-simultaneous-requests", "", 10, "The number of tries of simultaneous request")
 	rootCmd.PersistentFlags().UintVarP(&flag.Concurrency, "concurrency", "", 1, "1 means running check one by one. 2 means that two checks run concurrently")
 	rootCmd.PersistentFlags().StringVarP(&flag.ResultJSONLPath, "result-jsonl-path", "", "", "output file path of result JSONL")
 }
@@ -129,9 +131,12 @@ var rootCmd = &cobra.Command{
 		commonConfig.WaitDurationBetweenReceiverWroteRequestAndCancel = 3 * time.Second
 		// TODO: to be option
 		commonConfig.WaitDurationAfterReceiverCancel = 3 * time.Second
+		// TODO: to be option
+		commonConfig.FixedLengthBodyGetTimeout = 6 * time.Second
 		commonConfig.TransferBytePerSec = flag.LongTransferBytePerSec
 		slices.Sort(flag.TransferSpans)
 		commonConfig.SortedTransferSpans = flag.TransferSpans
+		commonConfig.NSimultaneousRequests = flag.NSimultaneousRequests
 
 		shouldExitWithNonZero := false
 		var jsonlBytes []byte

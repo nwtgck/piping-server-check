@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -49,6 +48,8 @@ type Config struct {
 	WaitDurationAfterSenderCancel                    time.Duration
 	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
 	WaitDurationAfterReceiverCancel                  time.Duration
+	FixedLengthBodyGetTimeout                        time.Duration
+	NSimultaneousRequests                            int
 }
 
 func protocolUsesTls(protocol Protocol) bool {
@@ -118,18 +119,6 @@ func FailedToGetPortError() ResultError {
 	return ResultError{Message: "failed to get port"}
 }
 
-func FailedToRunServerError(err error) ResultError {
-	return ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)}
-}
-
-func NotOkStatusError(status int) ResultError {
-	return ResultError{Message: fmt.Sprintf("not OK status: %d", status)}
-}
-
-func ContentTypeMismatchError(expectedContentType string, actualContentType string) ResultError {
-	return ResultError{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, actualContentType)}
-}
-
 type ResultWarning struct {
 	Message string `json:"message"`
 }
@@ -139,10 +128,6 @@ func NewWarning(message string, err error) ResultWarning {
 		return ResultWarning{Message: message}
 	}
 	return ResultWarning{Message: fmt.Sprintf("%s: %+v", message, err)}
-}
-
-func XRobotsTagNoneWarning(actualValue string) ResultWarning {
-	return ResultWarning{Message: fmt.Sprintf("X-Robots-Tag: none is recommeded but found '%+v'", actualValue)}
 }
 
 type Result struct {
@@ -156,6 +141,7 @@ type Result struct {
 }
 
 // Subcheck name is top-level. The same subcheck names in different checks should be the same meaning.
+// Purpose: Compromise in a narrow area not the entire check.
 const (
 	SubCheckNameProtocol                     = "protocol"
 	SubCheckNameSenderResponseBeforeReceiver = "sender_response_before_receiver"
@@ -238,22 +224,19 @@ func waitHTTPServer(httpClient *http.Client, healthCheckUrl string) {
 		if err == nil && (200 <= resp.StatusCode && resp.StatusCode < 300) {
 			return
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
-// To avoid port already used error
-var prepareServerMutex = new(sync.Mutex)
+var portPool = util.NewPortPool()
 
 func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
-	prepareServerMutex.Lock()
-	defer prepareServerMutex.Unlock()
-	httpPort, err := util.GetTCPPort()
+	httpPort, err := portPool.GetAndReserve()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
 	}
-	httpsPort, err := util.GetTCPAndUDPPort()
+	httpsPort, err := portPool.GetAndReserve()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
 		return
@@ -261,7 +244,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 
 	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort)
 	if err != nil {
-		resultErrors = append(resultErrors, FailedToRunServerError(err))
+		resultErrors = append(resultErrors, ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)})
 		return
 	}
 
@@ -285,6 +268,8 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 
 	stopSerer = func() {
 		cmd.Process.Signal(syscall.SIGTERM)
+		portPool.Release(httpPort)
+		portPool.Release(httpsPort)
 	}
 	serverPort := httpPort
 	if protocolUsesTls(config.Protocol) {

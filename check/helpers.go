@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func checkProtocol(resp *http.Response, expectedProto Protocol) []ResultError {
@@ -44,7 +45,7 @@ func sendOrGetAndCheck(httpClient *http.Client, req *http.Request, protocol Prot
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameProtocol, Errors: resultErrors})
 	}
 	if resp.StatusCode != 200 {
-		reporter.Report(NewRunCheckResultWithOneError(NotOkStatusError(resp.StatusCode)))
+		reporter.Report(NewRunCheckResultWithOneError(ResultError{Message: fmt.Sprintf("expected status=200 but status=%d found", resp.StatusCode)}))
 		return nil, false
 	}
 	return resp, true
@@ -55,7 +56,7 @@ func checkContentTypeForwarding(getResp *http.Response, expectedContentType stri
 	if receivedContentType == expectedContentType {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentType, receivedContentType)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentTypeForwarding, Errors: []ResultError{{Message: fmt.Sprintf("Content-Type should be %s but found %s", expectedContentType, receivedContentType)}}})
 	}
 }
 
@@ -64,7 +65,7 @@ func checkContentDispositionForwarding(getResp *http.Response, expectedContentDi
 	if receivedContentDisposition == expectedContentDisposition {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{ContentTypeMismatchError(expectedContentDisposition, receivedContentDisposition)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameContentDispositionForwarding, Errors: []ResultError{{Message: fmt.Sprintf("Content-Disposition should be %s but found %s", expectedContentDisposition, receivedContentDisposition)}}})
 	}
 }
 
@@ -73,7 +74,7 @@ func checkXRobotsTag(getResp *http.Response, reporter RunCheckReporter) {
 	if receivedXRobotsTag == "none" {
 		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone})
 	} else {
-		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{XRobotsTagNoneWarning(receivedXRobotsTag)}})
+		reporter.Report(RunCheckResult{SubCheckName: SubCheckNameXRobotsTagNone, Warnings: []ResultWarning{{Message: fmt.Sprintf("X-Robots-Tag: none is recommeded but found '%+v'", receivedXRobotsTag)}}})
 	}
 }
 
@@ -125,8 +126,7 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 			return
 		}
 	}
-	// TODO: GET-timeout (fixed-length body)
-	getResp, ok := <-getRespOneshot.Channel()
+	getResp, ok := respWithTimeout(SubCheckNameReusePath, "GET", getRespOneshot, config.FixedLengthBodyGetTimeout, reporter)
 	if !ok {
 		return
 	}
@@ -147,19 +147,34 @@ func checkTransferForReusePath(config *Config, url string, reporter RunCheckRepo
 	if !ok {
 		return
 	}
-	if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+	if ok := checkSenderRespReadUp(SubCheckNameReusePath, postResp, reporter); !ok {
 		return
 	}
 	reporter.Report(RunCheckResult{SubCheckName: SubCheckNameReusePath})
 }
 
-func checkSenderRespReadUp(resp *http.Response, reporter RunCheckReporter) bool {
+func respWithTimeout(subcheckName string /* empty string OK */, methodName string, respOneshot *oneshot.Oneshot[*http.Response], timeout time.Duration, reporter RunCheckReporter) (*http.Response, bool) {
+	var resp *http.Response
+	var ok bool
+	select {
+	case resp, ok = <-respOneshot.Channel():
+		if !ok {
+			return nil, false
+		}
+		return resp, true
+	case <-time.After(timeout):
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError(fmt.Sprintf("failed to receive a %s response in %v", methodName, timeout), nil)}})
+		return nil, false
+	}
+}
+
+func checkSenderRespReadUp(subcheckName string /* empty string OK */, resp *http.Response, reporter RunCheckReporter) bool {
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to read sender response body", err)))
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError("failed to read sender response body", err)}})
 		return false
 	}
 	if err := resp.Body.Close(); err != nil {
-		reporter.Report(NewRunCheckResultWithOneError(NewError("failed to close sender response body", err)))
+		reporter.Report(RunCheckResult{SubCheckName: subcheckName, Errors: []ResultError{NewError("failed to close sender response body", err)}})
 		return false
 	}
 	return true

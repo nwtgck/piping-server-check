@@ -82,8 +82,7 @@ func get_first() Check {
 				postRespOneshot.Send(postResp)
 			}()
 
-			// TODO: GET-timeout (fixed-length body)
-			getResp, ok := <-getRespOneshot.Channel()
+			getResp, ok := respWithTimeout("", "GET", getRespOneshot, config.FixedLengthBodyGetTimeout, reporter)
 			if !ok {
 				return
 			}
@@ -107,7 +106,7 @@ func get_first() Check {
 			if !ok {
 				return
 			}
-			if ok := checkSenderRespReadUp(postResp, reporter); !ok {
+			if ok := checkSenderRespReadUp(SubCheckNameTransferred, postResp, reporter); !ok {
 				return
 			}
 
