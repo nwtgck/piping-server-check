@@ -46,7 +46,7 @@ func (d *jsonDuration) MarshalJSON() ([]byte, error) {
 
 func init() {
 	cobra.OnInitialize()
-	rootCmd.PersistentFlags().StringVarP(&flag.ServerCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT in command")
+	rootCmd.PersistentFlags().StringVarP(&flag.ServerCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT, $SERVER_RUN_ID in command")
 	rootCmd.PersistentFlags().StringVarP(&flag.HealthCheckPath, "health-check-path", "", "/", "Health check path for server command. (e.g. /, /version)")
 	rootCmd.PersistentFlags().StringVarP(&flag.ServerSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
 	rootCmd.PersistentFlags().BoolVarP(&flag.TlsSkipVerify, "tls-skip-verify", "", false, "Skip verify TLS cert (like curl --insecure option)")
