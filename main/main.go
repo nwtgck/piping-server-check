@@ -16,6 +16,7 @@ import (
 )
 
 var flag struct {
+	SelectedCheckNames     []string        `json:"selected_checks,omitempty"`
 	ServerCommand          string          `json:"server_command,omitempty"`
 	HealthCheckPath        string          `json:"health_check_path"`
 	ServerSchemalessUrl    string          `json:"server_schemaless_url,omitempty"`
@@ -46,6 +47,7 @@ func (d *jsonDuration) MarshalJSON() ([]byte, error) {
 
 func init() {
 	cobra.OnInitialize()
+	rootCmd.PersistentFlags().StringArrayVarP(&flag.SelectedCheckNames, "check", "", nil, "Check selectively by check name. Without this check all.")
 	rootCmd.PersistentFlags().StringVarP(&flag.ServerCommand, "server-command", "", "", "Command to run a Piping Server. Use $HTTP_PORT, $HTTPS_PORT, $SERVER_RUN_ID in command")
 	rootCmd.PersistentFlags().StringVarP(&flag.HealthCheckPath, "health-check-path", "", "/", "Health check path for server command. (e.g. /, /version)")
 	rootCmd.PersistentFlags().StringVarP(&flag.ServerSchemalessUrl, "server-schemaless-url", "", "", "Piping Server schemaless URL (e.g. //ppng.io/myspace)")
@@ -91,6 +93,15 @@ var rootCmd = &cobra.Command{
 		}
 		commonConfig.HealthCheckPath = flag.HealthCheckPath
 		checks := check.AllChecks()
+		if len(flag.SelectedCheckNames) != 0 {
+			var selectedChecks []check.Check
+			for _, c := range checks {
+				if slices.Contains(flag.SelectedCheckNames, c.Name) {
+					selectedChecks = append(selectedChecks, c)
+				}
+			}
+			checks = selectedChecks
+		}
 		var protocols []check.Protocol
 		if flag.Http1_0 {
 			protocols = append(protocols, check.ProtocolHttp1_0)
