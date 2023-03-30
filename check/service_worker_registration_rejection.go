@@ -11,7 +11,7 @@ func service_worker_registration_rejection() Check {
 		Name: getCheckName(),
 		run: func(config *Config, reporter RunCheckReporter) {
 			defer reporter.Close()
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 			if !ok {
 				return
 			}

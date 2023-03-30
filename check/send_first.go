@@ -33,7 +33,7 @@ func put() Check {
 
 func sendFirstRun(sendMethod string, config *Config, reporter RunCheckReporter) {
 	defer reporter.Close()
-	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 	if !ok {
 		return
 	}
