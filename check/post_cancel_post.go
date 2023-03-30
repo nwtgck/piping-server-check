@@ -18,7 +18,7 @@ func post_cancel_post() Check {
 				reporter.Report(RunCheckResult{Warnings: []ResultWarning{NewWarning("Sorry. This check does not support HTTP/1.0 yet", nil)}})
 				return
 			}
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 			if !ok {
 				return
 			}

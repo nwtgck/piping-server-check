@@ -32,7 +32,7 @@ func simultaneous_request() Check {
 }
 
 func transferForSimultaneousRequest(config *Config, reporter RunCheckReporter) bool {
-	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+	serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 	if !ok {
 		return false
 	}

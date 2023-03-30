@@ -19,7 +19,7 @@ func post_first_byte_by_byte_streaming() Check {
 				// Skip because HTTP/1.0 has not chunked encoding
 				return
 			}
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 			if !ok {
 				return
 			}

@@ -27,7 +27,7 @@ func post_first_chunked_long_transfer() Check {
 				// TODO: create both long-transfer with chunked encoding and long-transfer with Content-Length
 				return
 			}
-			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, reporter)
+			serverUrl, ok, stopServerIfNeed := prepareServerUrl(config, &reporter)
 			if !ok {
 				return
 			}

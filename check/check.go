@@ -179,25 +179,22 @@ type Check struct {
 type RunCheckReporter struct {
 	ch          chan<- RunCheckResult
 	closed      *atomic.Bool
-	serverRunId *string
+	serverRunId string
 }
 
 func NewRunCheckReporter(ch chan<- RunCheckResult) RunCheckReporter {
-	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false), serverRunId: new(string)}
+	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false)}
 }
 
-func (r *RunCheckReporter) SetServerRunId(serverRunId string) {
-	if r.closed.Load() {
-		return
-	}
-	*r.serverRunId = serverRunId
+func (r *RunCheckReporter) SetServerRunId(serverRunId string /* empty string is OK */) {
+	r.serverRunId = serverRunId
 }
 
 func (r *RunCheckReporter) Report(result RunCheckResult) {
 	if r.closed.Load() {
 		return
 	}
-	result.ServerRunId = *r.serverRunId
+	result.ServerRunId = r.serverRunId
 	r.ch <- result
 }
 
@@ -318,7 +315,7 @@ func prepareServer(config *Config, serverRunId string) (serverUrl string, stopSe
 	return
 }
 
-func prepareServerUrl(config *Config, reporter RunCheckReporter) (serverUrl string, ok bool, stopServerIfNeed func()) {
+func prepareServerUrl(config *Config, reporter *RunCheckReporter) (serverUrl string, ok bool, stopServerIfNeed func()) {
 	if config.ServerSchemalessUrl == "" {
 		var stopServer func()
 		var resultErrors []ResultError
