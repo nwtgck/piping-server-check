@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/itchyny/timefmt-go"
 	"github.com/nwtgck/piping-server-check/http10_round_tripper"
 	"github.com/nwtgck/piping-server-check/util"
 	"github.com/quic-go/quic-go/http3"
@@ -15,7 +16,9 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -132,12 +135,13 @@ func NewWarning(message string, err error) ResultWarning {
 
 type Result struct {
 	// result name can be "<check name>.<subcheck name>" or "<check name>"
-	Name      string          `json:"name"`
-	Protocol  Protocol        `json:"protocol"`
-	Message   string          `json:"message,omitempty"`
-	OkForJson *bool           `json:"ok,omitempty"`
-	Errors    []ResultError   `json:"errors,omitempty"`
-	Warnings  []ResultWarning `json:"warnings,omitempty"`
+	Name        string          `json:"name"`
+	Protocol    Protocol        `json:"protocol"`
+	Message     string          `json:"message,omitempty"`
+	OkForJson   *bool           `json:"ok,omitempty"`
+	Errors      []ResultError   `json:"errors,omitempty"`
+	Warnings    []ResultWarning `json:"warnings,omitempty"`
+	ServerRunId string          `json:"server_run_id,omitempty"`
 }
 
 // Subcheck name is top-level. The same subcheck names in different checks should be the same meaning.
@@ -160,6 +164,7 @@ type RunCheckResult struct {
 	Message      string
 	Errors       []ResultError
 	Warnings     []ResultWarning
+	ServerRunId  string
 }
 
 func NewRunCheckResultWithOneError(resultError ResultError) RunCheckResult {
@@ -172,18 +177,27 @@ type Check struct {
 }
 
 type RunCheckReporter struct {
-	ch     chan<- RunCheckResult
-	closed *atomic.Bool
+	ch          chan<- RunCheckResult
+	closed      *atomic.Bool
+	serverRunId *string
 }
 
 func NewRunCheckReporter(ch chan<- RunCheckResult) RunCheckReporter {
-	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false)}
+	return RunCheckReporter{ch: ch, closed: atomic.NewBool(false), serverRunId: new(string)}
+}
+
+func (r *RunCheckReporter) SetServerRunId(serverRunId string) {
+	if r.closed.Load() {
+		return
+	}
+	*r.serverRunId = serverRunId
 }
 
 func (r *RunCheckReporter) Report(result RunCheckResult) {
 	if r.closed.Load() {
 		return
 	}
+	result.ServerRunId = *r.serverRunId
 	r.ch <- result
 }
 
@@ -202,9 +216,9 @@ func getCheckName() string {
 	return functionName[index+1:]
 }
 
-func startServer(cmd []string, httpPort string, httpsPort string) (c *exec.Cmd, stdout io.ReadCloser, stderr io.ReadCloser, err error) {
+func startServer(cmd []string, httpPort string, httpsPort string, runServerId string) (c *exec.Cmd, stdout io.ReadCloser, stderr io.ReadCloser, err error) {
 	c = exec.Command(cmd[0], cmd[1:]...)
-	c.Env = append(os.Environ(), "HTTP_PORT="+httpPort, "HTTPS_PORT="+httpsPort)
+	c.Env = append(os.Environ(), "HTTP_PORT="+httpPort, "HTTPS_PORT="+httpsPort, "SERVER_RUN_ID="+runServerId)
 	stdout, err = c.StdoutPipe()
 	if err != nil {
 		return
@@ -228,9 +242,20 @@ func waitHTTPServer(httpClient *http.Client, healthCheckUrl string) {
 	}
 }
 
+var currentServerRunIdInt = 1
+var currentServerRunIdMutex sync.Mutex
+
+func generateServerRunId() string {
+	currentServerRunIdMutex.Lock()
+	defer currentServerRunIdMutex.Unlock()
+	runServerId := timefmt.Format(time.Now(), "R_%Y%m%d_%H%M%S_N") + strconv.Itoa(currentServerRunIdInt)
+	currentServerRunIdInt++
+	return runServerId
+}
+
 var portPool = util.NewPortPool()
 
-func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
+func prepareServer(config *Config, serverRunId string) (serverUrl string, stopSerer func(), resultErrors []ResultError) {
 	httpPort, err := portPool.GetAndReserve()
 	if err != nil {
 		resultErrors = append(resultErrors, FailedToGetPortError())
@@ -242,7 +267,7 @@ func prepareServer(config *Config) (serverUrl string, stopSerer func(), resultEr
 		return
 	}
 
-	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort)
+	cmd, _, stderr, err := startServer(config.RunServerCmd, httpPort, httpsPort, serverRunId)
 	if err != nil {
 		resultErrors = append(resultErrors, ResultError{Message: fmt.Sprintf("failed to run server: %+v", err)})
 		return
@@ -297,11 +322,13 @@ func prepareServerUrl(config *Config, reporter RunCheckReporter) (serverUrl stri
 	if config.ServerSchemalessUrl == "" {
 		var stopServer func()
 		var resultErrors []ResultError
-		serverUrl, stopServer, resultErrors = prepareServer(config)
+		serverRunId := generateServerRunId()
+		serverUrl, stopServer, resultErrors = prepareServer(config, serverRunId)
 		if len(resultErrors) != 0 {
 			reporter.Report(RunCheckResult{Errors: resultErrors})
 			return
 		}
+		reporter.SetServerRunId(serverRunId)
 		return serverUrl, true, stopServer
 	}
 	if protocolUsesTls(config.Protocol) {
@@ -334,6 +361,7 @@ func runCheck(c *Check, config *Config, resultCh chan<- Result) {
 		result.Message = runCheckResult.Message
 		result.Errors = runCheckResult.Errors
 		result.Warnings = runCheckResult.Warnings
+		result.ServerRunId = runCheckResult.ServerRunId
 		result.Protocol = config.Protocol
 		if len(result.Errors) == 0 {
 			result.OkForJson = new(bool)

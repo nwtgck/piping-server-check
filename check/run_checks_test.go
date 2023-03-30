@@ -108,6 +108,8 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 	for result := range RunChecks(checks, &config, protocols) {
 		// Remove messages because some of them are not predictable
 		result.Message = ""
+		// server run ID is not predictable
+		result.ServerRunId = ""
 		results = append(results, result)
 	}
 	truePointer := new(bool)
