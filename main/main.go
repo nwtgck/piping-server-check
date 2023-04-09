@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/nwtgck/piping-server-check/check"
 	"github.com/nwtgck/piping-server-check/version"
@@ -173,6 +174,7 @@ var rootCmd = &cobra.Command{
 		}
 		jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
 		fmt.Println(fmt.Sprintf("　 %s", string(jsonBytes)))
+		usedCompromises := mapset.NewSet[string]()
 		// TODO: output version
 		for result := range check.RunChecks(checks, &commonConfig, protocols) {
 			jsonBytes, err := json.Marshal(&result)
@@ -182,17 +184,34 @@ var rootCmd = &cobra.Command{
 			line := string(jsonBytes)
 			jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
 			if len(result.Errors) != 0 {
-				if shouldCompromise(&result) {
-					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
-				} else {
+				compromise := findCompromise(&result)
+				if compromise == "" {
 					shouldExitWithNonZero = true
 					line = color.RedString(fmt.Sprintf("✖︎ %s", line))
+				} else {
+					usedCompromises.Add(compromise)
+					line = color.MagentaString(fmt.Sprintf("✖︎ %s", line))
 				}
 			} else if len(result.Warnings) != 0 {
 				line = color.YellowString(fmt.Sprintf("⚠︎ %s", line))
 			} else {
 				line = color.GreenString(fmt.Sprintf("✔︎ %s", line))
 			}
+			fmt.Println(line)
+		}
+		unusedCompromises := mapset.NewSet(flag.Compromises...).Difference(usedCompromises).ToSlice()
+		if len(unusedCompromises) != 0 {
+			v := struct {
+				UnusedCompromises []string `json:"unused_compromises"`
+			}{
+				UnusedCompromises: unusedCompromises,
+			}
+			jsonBytes, err := json.Marshal(&v)
+			if err != nil {
+				return err
+			}
+			jsonlBytes = append(jsonlBytes, append(jsonBytes, 10)...)
+			line := color.YellowString(fmt.Sprintf("⚠︎ %s", string(jsonBytes)))
 			fmt.Println(line)
 		}
 		if flag.ResultJSONLPath != "" {
@@ -208,17 +227,17 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func shouldCompromise(result *check.Result) bool {
+func findCompromise(result *check.Result) string /* empty string means not found */ {
 	for _, compromise := range flag.Compromises {
 		splits := strings.SplitN(compromise, "/", 2)
 		if len(splits) == 1 && splits[0] == result.Name {
-			return true
+			return compromise
 		}
 		if len(splits) == 2 && check.Protocol(splits[0]) == result.Protocol && splits[1] == result.Name {
-			return true
+			return compromise
 		}
 	}
-	return false
+	return ""
 }
 
 func main() {

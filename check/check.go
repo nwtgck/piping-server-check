@@ -216,7 +216,6 @@ func getCheckName() string {
 func startServer(cmd []string, httpPort string, httpsPort string, runServerId string) (c *exec.Cmd, stdout io.ReadCloser, stderr io.ReadCloser, err error) {
 	c = exec.Command(cmd[0], cmd[1:]...)
 	c.Env = append(os.Environ(), "HTTP_PORT="+httpPort, "HTTPS_PORT="+httpsPort, "SERVER_RUN_ID="+runServerId)
-	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	stdout, err = c.StdoutPipe()
 	if err != nil {
 		return
@@ -290,8 +289,7 @@ func prepareServer(config *Config, serverRunId string) (serverUrl string, stopSe
 	}()
 
 	stopSerer = func() {
-		// https://makiuchi-d.github.io/2020/05/10/go-kill-child-process.ja.html
-		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		cmd.Process.Signal(syscall.SIGTERM)
 		portPool.Release(httpPort)
 		portPool.Release(httpsPort)
 	}
