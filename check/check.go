@@ -52,6 +52,7 @@ type Config struct {
 	WaitDurationBetweenReceiverWroteRequestAndCancel time.Duration
 	WaitDurationAfterReceiverCancel                  time.Duration
 	FixedLengthBodyGetTimeout                        time.Duration
+	ServiceWorkerRejectionTimeout                    time.Duration
 	NSimultaneousRequests                            int
 }
 

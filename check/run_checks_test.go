@@ -57,6 +57,7 @@ func TestRunChecksForHTTP1_0(t *testing.T) {
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		ServiceWorkerRejectionTimeout:                    1 * time.Second,
 		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolHttp1_0, ProtocolHttp1_0_tls}
@@ -101,6 +102,7 @@ func TestRunChecksForHTTP1_1(t *testing.T) {
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		ServiceWorkerRejectionTimeout:                    1 * time.Second,
 		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolHttp1_1}
@@ -160,6 +162,7 @@ func TestRunChecksForH2C(t *testing.T) {
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		ServiceWorkerRejectionTimeout:                    1 * time.Second,
 		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolH2c}
@@ -201,6 +204,7 @@ func TestRunChecksForH3(t *testing.T) {
 		WaitDurationBetweenReceiverWroteRequestAndCancel: 2 * time.Second,
 		WaitDurationAfterReceiverCancel:                  1 * time.Second,
 		FixedLengthBodyGetTimeout:                        3 * time.Second,
+		ServiceWorkerRejectionTimeout:                    1 * time.Second,
 		NSimultaneousRequests:                            1,
 	}
 	protocols := []Protocol{ProtocolH3}
