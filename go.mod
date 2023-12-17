@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/deckarep/golang-set/v2 v2.5.0
-	github.com/fatih/color v1.15.0
+	github.com/fatih/color v1.16.0
 	github.com/google/uuid v1.5.0
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/k0kubun/pp/v3 v3.2.0
@@ -23,7 +23,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.18 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
