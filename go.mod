@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/k0kubun/pp/v3 v3.2.0
-	github.com/quic-go/quic-go v0.40.1
+	github.com/quic-go/quic-go v0.41.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/atomic v1.11.0
@@ -27,7 +27,6 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-20 v0.4.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/mock v0.3.0 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
