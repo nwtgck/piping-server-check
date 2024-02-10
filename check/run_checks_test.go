@@ -228,5 +228,6 @@ func TestRunChecksForH3(t *testing.T) {
 		"post_first.same_path_sender_rejection",
 		"put.same_path_sender_rejection",
 		"get_cancel_get",
+		"get_cancel_get",
 	})
 }
