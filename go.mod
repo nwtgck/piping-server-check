@@ -10,7 +10,7 @@ require (
 	github.com/k0kubun/pp/v3 v3.2.0
 	github.com/quic-go/quic-go v0.41.0
 	github.com/spf13/cobra v1.8.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3
 	golang.org/x/net v0.21.0
