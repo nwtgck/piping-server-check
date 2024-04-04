@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.23.0
 )
 
 require (
