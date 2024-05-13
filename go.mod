@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/fatih/color v1.16.0
+	github.com/fatih/color v1.17.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/k0kubun/pp/v3 v3.2.0
