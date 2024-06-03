@@ -4,7 +4,8 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
+      # NOTE: Drop Windows support because of syscall
+      # - windows
       - darwin
       # TODO: Uncomment out when the development stabilized.
       # - freebsd

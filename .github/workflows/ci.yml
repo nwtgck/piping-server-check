@@ -20,7 +20,9 @@ jobs:
           DIST=/tmp/dist
           mkdir -p $DIST
           # (from: https://www.digitalocean.com/community/tutorials/how-to-build-go-executables-for-multiple-platforms-on-ubuntu-16-04)
-          platforms=("linux/amd64" "darwin/amd64" "windows/amd64")
+          # NOTE: Drop Windows support because of syscall
+          # platforms=("linux/amd64" "darwin/amd64" "windows/amd64")
+          platforms=("linux/amd64" "darwin/amd64")
           for platform in "${platforms[@]}"
           do
               platform_split=(${platform//\// })

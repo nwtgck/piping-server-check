@@ -216,6 +216,7 @@ func getCheckName() string {
 
 func startServer(cmd []string, httpPort string, httpsPort string, runServerId string) (c *exec.Cmd, stdout io.ReadCloser, stderr io.ReadCloser, err error) {
 	c = exec.Command(cmd[0], cmd[1:]...)
+	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	c.Env = append(os.Environ(), "HTTP_PORT="+httpPort, "HTTPS_PORT="+httpsPort, "SERVER_RUN_ID="+runServerId)
 	stdout, err = c.StdoutPipe()
 	if err != nil {
@@ -290,7 +291,10 @@ func prepareServer(config *Config, serverRunId string) (serverUrl string, stopSe
 	}()
 
 	stopSerer = func() {
-		cmd.Process.Signal(syscall.SIGTERM)
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to stop server %s: %+v\n", serverRunId, err)
+			return
+		}
 		portPool.Release(httpPort)
 		portPool.Release(httpsPort)
 	}
