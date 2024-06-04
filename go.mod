@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/k0kubun/pp/v3 v3.2.0
-	github.com/quic-go/quic-go v0.43.1
+	github.com/quic-go/quic-go v0.44.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/atomic v1.11.0
