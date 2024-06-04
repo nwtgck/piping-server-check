@@ -6,7 +6,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/fatih/color v1.17.0
 	github.com/google/uuid v1.6.0
-	github.com/itchyny/timefmt-go v0.1.5
+	github.com/itchyny/timefmt-go v0.1.6
 	github.com/k0kubun/pp/v3 v3.2.0
 	github.com/quic-go/quic-go v0.44.0
 	github.com/spf13/cobra v1.8.0
