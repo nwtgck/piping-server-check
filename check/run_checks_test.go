@@ -17,7 +17,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	goPipingServer0_5_0Path, err = downloadGoPipingServerIfNotCached("0.5.0")
+	goPipingServer0_5_0Path, err = downloadGoPipingServerIfNotCached("0.6.3")
 	if err != nil {
 		panic(err)
 	}
