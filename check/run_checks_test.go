@@ -185,6 +185,7 @@ func TestRunChecksForH2C(t *testing.T) {
 }
 
 func TestRunChecksForH3(t *testing.T) {
+	//t.Skip()
 	keyPath, certPath, removeKeyAndCert, err := createKeyAndCert()
 	if err != nil {
 		panic(err)
