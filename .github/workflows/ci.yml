@@ -38,7 +38,7 @@ jobs:
       - name: UDP receive buffer size seting
         run: sudo sysctl -w net.core.rmem_max=2500000
       - name: Test
-        run: go test -v ./...
+        run: go test -v -count 1 ./...
         timeout-minutes: 1
 
   operational_test:
