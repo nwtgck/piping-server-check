@@ -9,7 +9,7 @@ require (
 	github.com/itchyny/timefmt-go v0.1.6
 	github.com/k0kubun/pp/v3 v3.2.0
 	github.com/quic-go/quic-go v0.44.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc
