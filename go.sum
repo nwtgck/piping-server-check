@@ -19,8 +19,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/itchyny/timefmt-go v0.1.6 h1:ia3s54iciXDdzWzwaVKXZPbiXzxxnv1SPGFfM/myJ5Q=
 github.com/itchyny/timefmt-go v0.1.6/go.mod h1:RRDZYC5s9ErkjQvTvvU7keJjxUYzIISJGxm9/mAERQg=
-github.com/k0kubun/pp/v3 v3.3.0 h1:/Unrck5tDGUSjsUJsmx9GUL64pNKOY5UEdoP1F7FBq8=
-github.com/k0kubun/pp/v3 v3.3.0/go.mod h1:wJadGBvcY6JKaiUkB89VzUACKDmTX1r4aQTPERpZc6w=
+github.com/k0kubun/pp/v3 v3.4.1 h1:1WdFZDRRqe8UsR61N/2RoOZ3ziTEqgTPVqKrHeb779Y=
+github.com/k0kubun/pp/v3 v3.4.1/go.mod h1:+SiNiqKnBfw1Nkj82Lh5bIeKQOAkPy6Xw9CAZUZ8npI=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-colorable v0.1.13/go.mod h1:7S9/ev0klgBDR4GtXTXX8a3vIGJpMovkB8vQcUbaXHg=
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
