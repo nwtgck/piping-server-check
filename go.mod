@@ -3,7 +3,7 @@ module github.com/nwtgck/piping-server-check
 go 1.21
 
 require (
-	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/deckarep/golang-set/v2 v2.7.0
 	github.com/fatih/color v1.17.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/timefmt-go v0.1.6
