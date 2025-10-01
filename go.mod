@@ -1,12 +1,12 @@
 module github.com/nwtgck/piping-server-check
 
-go 1.21
+go 1.24
 
 require (
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/fatih/color v1.17.0
 	github.com/google/uuid v1.6.0
-	github.com/itchyny/timefmt-go v0.1.6
+	github.com/itchyny/timefmt-go v0.1.7
 	github.com/k0kubun/pp/v3 v3.3.0
 	github.com/quic-go/quic-go v0.45.1
 	github.com/spf13/cobra v1.9.1
